@@ -1,0 +1,63 @@
+VERSION "AEROTWIN_ENGINE_V1"
+
+NS_ :
+	BA_
+	BA_DEF_
+	BA_DEF_DEF_
+	CM_
+	SG_MUL_VAL_
+
+BS_:
+
+BU_: ECU_PORT ECU_STBD GCS
+
+BO_ 2364540158 EEC1 : 8 ECU_PORT
+ SG_ EngineSpeed : 24|16@1+ (0.125,0) [0|8031.875] "rpm" GCS
+ SG_ ActualEnginePercentTorque : 16|8@1+ (1,-125) [-125|125] "%" GCS
+ SG_ DriversDemandPercentTorque : 8|8@1+ (1,-125) [-125|125] "%" GCS
+
+BO_ 2566844670 ET1 : 8 ECU_PORT
+ SG_ EngineCoolantTemperature : 0|8@1+ (1,-40) [-40|210] "degC" GCS
+ SG_ EngineFuelTemperature : 8|8@1+ (1,-40) [-40|210] "degC" GCS
+ SG_ EngineOilTemperature : 16|16@1+ (0.03125,-273) [-273|1735] "degC" GCS
+ SG_ EngineTurboOilTemperature : 32|16@1+ (0.03125,-273) [-273|1735] "degC" GCS
+
+BO_ 2566844926 EFL_P1 : 8 ECU_PORT
+ SG_ EngineFuelDeliveryPressure : 0|8@1+ (4,0) [0|1000] "kPa" GCS
+ SG_ EngineOilLevel : 8|8@1+ (0.4,0) [0|100] "%" GCS
+ SG_ EngineOilPressure : 16|8@1+ (4,0) [0|1000] "kPa" GCS
+ SG_ EngineCoolantPressure : 32|8@1+ (2,0) [0|500] "kPa" GCS
+
+BO_ 2566845182 IC1 : 8 ECU_PORT
+ SG_ EngineIntakeManifoldPressure : 8|8@1+ (2,0) [0|500] "kPa" GCS
+ SG_ EngineIntakeManifoldTemperature : 16|8@1+ (1,-40) [-40|210] "degC" GCS
+ SG_ EngineExhaustGasTemperature : 24|16@1+ (0.03125,-273) [-273|1735] "degC" GCS
+
+BO_ 2566845438 LFE : 8 ECU_PORT
+ SG_ EngineFuelRate : 0|16@1+ (0.05,0) [0|3212.75] "L/h" GCS
+ SG_ EngineInstantaneousFuelEconomy : 16|16@1+ (0.001953125,0) [0|125.5] "km/L" GCS
+
+BO_ 2566845694 VIB1 : 8 ECU_PORT
+ SG_ EngineVibrationRMS : 0|16@1+ (0.001,0) [0|65.535] "mm/s" GCS
+ SG_ EngineVibrationPeak : 16|16@1+ (0.001,0) [0|65.535] "mm/s" GCS
+ SG_ CylinderHeadTemperature : 32|16@1+ (0.03125,-273) [-273|1735] "degC" GCS
+
+BO_ 2566845950 INJ1 : 8 ECU_PORT
+ SG_ Injector1TimingActual : 0|16@1+ (0.0078125,-200) [-200|301.99] "deg" GCS
+ SG_ Injector2TimingActual : 16|16@1+ (0.0078125,-200) [-200|301.99] "deg" GCS
+ SG_ Injector3TimingActual : 32|16@1+ (0.0078125,-200) [-200|301.99] "deg" GCS
+ SG_ Injector4TimingActual : 48|16@1+ (0.0078125,-200) [-200|301.99] "deg" GCS
+
+BO_ 2566846206 RAIL1 : 8 ECU_PORT
+ SG_ CommonRailPressure : 0|16@1+ (0.1,0) [0|6553.5] "bar" GCS
+ SG_ AlternatorVoltage : 16|16@1+ (0.05,0) [0|3212.75] "V" GCS
+ SG_ AlternatorCurrent : 32|16@1+ (0.05,-1600) [-1600|1612] "A" GCS
+
+CM_ BO_ 2364540158 "Electronic Engine Controller 1 - PGN 61444";
+CM_ BO_ 2566844670 "Engine Temperature 1 - PGN 65262";
+CM_ BO_ 2566844926 "Engine Fluid Level/Pressure 1 - PGN 65263";
+CM_ BO_ 2566845182 "Intake/Exhaust Conditions 1 - PGN 65270";
+CM_ BO_ 2566845438 "Fuel Economy Liquid - PGN 65266";
+CM_ BO_ 2566845694 "Vibration and head temperature - proprietary";
+CM_ BO_ 2566845950 "Per-injector timing - proprietary";
+CM_ BO_ 2566846206 "Common rail and electrical - proprietary";

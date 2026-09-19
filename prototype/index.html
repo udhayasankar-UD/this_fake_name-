@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Engine health — TAPAS digital twin</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="app">
+  <section class="stage">
+    <canvas id="viewport"></canvas>
+    <div id="labels" aria-live="polite"></div>
+
+    <div class="stage-head">
+      <div>
+        <p class="stage-title" id="stage-title">Aircraft</p>
+        <p class="stage-sub" id="stage-sub">Select an engine to inspect</p>
+      </div>
+      <p class="stage-sub" id="tier-note"></p>
+    </div>
+
+    <!-- floating tabbed info bar: Findings | Readings -->
+    <div class="stage-infobar" id="stage-infobar">
+      <div class="stab-bar" role="tablist">
+        <button class="stab active" id="stab-findings" role="tab" aria-selected="true"  aria-controls="panel-findings">Findings</button>
+        <button class="stab hidden"  id="stab-readings" role="tab" aria-selected="false" aria-controls="panel-readings">Readings</button>
+      </div>
+      <div class="stab-panel" id="panel-findings" role="tabpanel">
+        <div id="findings"><p class="empty">No active findings.</p></div>
+      </div>
+      <div class="stab-panel hidden" id="panel-readings" role="tabpanel">
+        <div class="readouts" id="readouts"></div>
+      </div>
+    </div>
+
+    <div class="stage-foot">
+      <button id="btn-back" class="hidden">Back to aircraft</button>
+      <span class="spacer"></span>
+      <span class="hint" id="hint">Drag to rotate</span>
+    </div>
+
+    <div class="loading" id="loading">Loading aircraft…</div>
+  </section>
+
+  <aside class="side">
+    <div class="side-head">
+      <div class="side-head-row">
+        <h2 id="side-title">Propulsion status</h2>
+        <span class="live-badge offline" id="live-badge">● Offline</span>
+      </div>
+      <p id="side-sub">Twin engine, live telemetry</p>
+    </div>
+
+    <div class="section" id="sec-engines">
+      <h3>Engines</h3>
+      <div class="engine-entry">
+        <button class="engine-card" id="card-port" aria-current="false">
+          <svg class="status-ring unknown" id="ring-port" width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"/>
+          </svg>
+          <span class="label">
+            <span class="name">Port</span><br />
+            <span class="state" id="state-port">Not evaluated</span>
+          </span>
+          <span class="pill unknown" id="pill-port">Unsure</span>
+        </button>
+        <div class="engine-rul" id="rul-port"></div>
+      </div>
+      <div class="engine-entry">
+        <button class="engine-card" id="card-starboard" aria-current="false">
+          <svg class="status-ring unknown" id="ring-starboard" width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"/>
+          </svg>
+          <span class="label">
+            <span class="name">Starboard</span><br />
+            <span class="state" id="state-starboard">Not evaluated</span>
+          </span>
+          <span class="pill unknown" id="pill-starboard">Unsure</span>
+        </button>
+        <div class="engine-rul" id="rul-starboard"></div>
+      </div>
+    </div>
+
+    <div class="section hidden" id="sec-extra-wrap">
+      <h3>Projection</h3>
+      <div id="sec-extra"></div>
+    </div>
+
+    <div class="section hidden" id="sec-parts">
+      <h3>Components</h3>
+      <div class="parts" id="parts"></div>
+    </div>
+
+    <div class="section">
+      <h3>Simulate</h3>
+      <div class="sim-grid">
+        <button class="sim-clear" data-sim="clear">Clear</button>
+        <button data-sim="injector">Injector fault, port</button>
+        <button data-sim="sensor">Sensor fault, starboard</button>
+        <button data-sim="systemic">Both engines drift</button>
+      </div>
+    </div>
+  </aside>
+</div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
