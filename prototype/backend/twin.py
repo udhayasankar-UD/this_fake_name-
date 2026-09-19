@@ -366,8 +366,21 @@ def mission_margin(port: dict, starboard: dict, hours_required: float):
 
 def load_detector():
     if os.path.exists(MODEL_PATH):
-        with open(MODEL_PATH, 'rb') as f:
-            return pickle.load(f)
+        try:
+            with open(MODEL_PATH, 'rb') as f:
+                return pickle.load(f)
+        except Exception as e:
+            print(f'Warning: could not unpickle {MODEL_PATH} ({e}). Retraining for current environment...')
+            try:
+                backend_dir = os.path.dirname(os.path.abspath(__file__))
+                if backend_dir not in sys.path:
+                    sys.path.insert(0, backend_dir)
+                import train
+                train.main()
+                with open(MODEL_PATH, 'rb') as f:
+                    return pickle.load(f)
+            except Exception as train_err:
+                print(f'Auto-retraining failed: {train_err}')
     d = Detector()
     d.trained = False
     return d
