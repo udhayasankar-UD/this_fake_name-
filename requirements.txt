@@ -2,6 +2,6 @@ fastapi>=0.110
 uvicorn[standard]>=0.27
 websockets>=12.0
 numpy>=1.26
-scikit-learn>=1.4
+scikit-learn==1.8.0
 python-can>=4.3
 cantools>=39.0
