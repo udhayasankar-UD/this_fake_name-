@@ -552,3 +552,6 @@ button:disabled:hover { background: transparent; }
 .margin-value.unknown { color: var(--unknown); }
 .margin-value.secondary { font-size: 20px; }
 .margin-label { font-size: 11px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.04em; }
+
+.inspect-hint { font-size: 11px; color: var(--ink-faint); }
+.engine-card:hover .inspect-hint { color: var(--ink-soft); }

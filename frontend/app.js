@@ -1064,6 +1064,24 @@ const ptr = new THREE.Vector2();
 let downAt = null;
 
 canvas.addEventListener('pointerdown', e => { downAt = { x: e.clientX, y: e.clientY }; });
+canvas.addEventListener('pointermove', e => {
+  if (view !== 'aircraft' || !aircraft) {
+    if (canvas.style.cursor) canvas.style.cursor = '';
+    return;
+  }
+  const r = canvas.getBoundingClientRect();
+  ptr.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+  ptr.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+  ray.setFromCamera(ptr, camera);
+  const hits = ray.intersectObject(aircraft, true);
+  let isNacelle = false;
+  if (hits.length) {
+    let n = hits[0].object;
+    while (n && !/^engine_(port|starboard)$/.test(n.name)) n = n.parent;
+    if (n) isNacelle = true;
+  }
+  canvas.style.cursor = isNacelle ? 'pointer' : '';
+});
 canvas.addEventListener('pointerup', e => {
   if (!downAt) return;
   const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y);
