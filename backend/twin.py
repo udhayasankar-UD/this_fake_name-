@@ -13,6 +13,7 @@ Order of operations per tick, and the order matters:
 """
 
 import time
+import sys
 import numpy as np
 import pickle
 import os
@@ -281,7 +282,7 @@ def correlate(port: dict, starboard: dict):
             kind='shared_cause',
             similarity=round(cos, 3),
             headline='Matching deviation on both engines',
-            detail=('Port and starboard residuals point the same way '
+            detail=('Port (left) and starboard (right) residuals point the same way '
                     f'(similarity {cos:.2f}). A shared cause - fuel, ambient conditions '
                     'or a calibration shift - is more likely than the same fault '
                     'appearing independently on both engines.'),
@@ -384,3 +385,4 @@ def load_detector():
     d = Detector()
     d.trained = False
     return d
+

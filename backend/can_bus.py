@@ -39,7 +39,7 @@ class EngineBus:
                 self.bus = None
 
         if self.bus is None:
-            self.bus = can.interface.Bus(channel='aerotwin', interface='virtual',
+            self.bus = can.interface.Bus(channel='shadowtwin', interface='virtual',
                                          receive_own_messages=True)
             self.backend = 'virtual'
 

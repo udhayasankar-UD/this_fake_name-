@@ -14,6 +14,7 @@ import pickle
 import os
 from train import run_segment
 from detect import FAULT_LABELS
+from twin import load_detector
 
 MODEL_PATH = os.path.join(os.path.dirname(__file__), 'models.pkl')
 SEVERITIES = [0.10, 0.20, 0.35, 0.50, 0.75, 1.00]
@@ -21,7 +22,7 @@ REPEATS = 6
 
 
 def main():
-    det = pickle.load(open(MODEL_PATH, 'rb'))
+    det = load_detector()
     rng = np.random.default_rng(101)
 
     # ---- false positives on healthy

@@ -34,10 +34,14 @@ STREAM_HZ = 5
 # Degradation happens over hundreds of flight hours. To make trends observable in a
 # demo that runs for minutes, flight time advances faster than wall clock. This
 # affects the RUL time axis only - never the physics, which steps at real DT.
-TIME_SCALE = float(os.environ.get('AEROTWIN_TIME_SCALE', '120'))
-SOCKETCAN_CHANNEL = os.environ.get('AEROTWIN_CAN')   # e.g. "vcan0"
+TIME_SCALE = float(os.environ.get('SHADOWTWIN_TIME_SCALE', '120'))
+SOCKETCAN_CHANNEL = os.environ.get('SHADOWTWIN_CAN')   # e.g. "vcan0"
 
-app = FastAPI(title='Aero twin ground service')
+app = FastAPI(title='shadow-twin ground service')
+
+# CORS: '*' is intentional for the initial Render deploy.
+# Once the Vercel frontend URL is confirmed, tighten to:
+# allow_origins=['https://shadow-twin.vercel.app']
 app.add_middleware(CORSMiddleware, allow_origins=['*'], allow_methods=['*'],
                    allow_headers=['*'])
 
@@ -244,9 +248,13 @@ async def ws(sock: WebSocket):
         station.clients.discard(sock)
 
 
-_here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if os.path.isdir(_here):
-    app.mount('/', StaticFiles(directory=_here, html=True), name='ui')
+_backend_dir = os.path.dirname(os.path.abspath(__file__))
+_frontend_dir = os.path.join(os.path.dirname(_backend_dir), 'frontend')
+if not os.path.isdir(_frontend_dir):
+    _frontend_dir = os.path.join(_backend_dir, 'frontend')
+
+if os.path.isdir(_frontend_dir):
+    app.mount('/', StaticFiles(directory=_frontend_dir, html=True), name='ui')
 
 
 if __name__ == '__main__':

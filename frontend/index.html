@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Engine health — TAPAS digital twin</title>
+<title>shadow-twin</title>
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -60,7 +60,7 @@
             <circle cx="11" cy="11" r="8"/>
           </svg>
           <span class="label">
-            <span class="name">Port</span><br />
+            <span class="name">Port (Left)</span><br />
             <span class="state" id="state-port">Not evaluated</span>
           </span>
           <span class="pill unknown" id="pill-port">Unsure</span>
@@ -73,7 +73,7 @@
             <circle cx="11" cy="11" r="8"/>
           </svg>
           <span class="label">
-            <span class="name">Starboard</span><br />
+            <span class="name">Starboard (Right)</span><br />
             <span class="state" id="state-starboard">Not evaluated</span>
           </span>
           <span class="pill unknown" id="pill-starboard">Unsure</span>
@@ -96,13 +96,14 @@
       <h3>Simulate</h3>
       <div class="sim-grid">
         <button class="sim-clear" data-sim="clear">Clear</button>
-        <button data-sim="injector">Injector fault, port</button>
-        <button data-sim="sensor">Sensor fault, starboard</button>
+        <button data-sim="injector">Injector fault, port (left)</button>
+        <button data-sim="sensor">Sensor fault, starboard (right)</button>
         <button data-sim="systemic">Both engines drift</button>
       </div>
     </div>
   </aside>
 </div>
+<script src="config.js"></script>
 <script type="module" src="app.js"></script>
 </body>
 </html>

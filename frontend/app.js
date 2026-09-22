@@ -175,9 +175,27 @@ function loadEngine() {
 
 /* ---------- live state from the backend ---------- */
 
-const API = (location.port === '8000' || location.port === '')
-  ? '' : 'http://localhost:8000';
-const WS = (API || location.origin).replace(/^http/, 'ws') + '/ws';
+function resolveBackend() {
+  const params = new URLSearchParams(window.location.search);
+  const qb = params.get('backend');
+  if (qb) return qb.replace(/\/+$/, '');
+
+  // Local development: always default to local backend
+  if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+    return (location.port === '8000' || location.port === '') ? '' : 'http://localhost:8000';
+  }
+
+  // Deployed environment (e.g. Vercel): use configured Render backend URL
+  if (window.SHADOWTWIN_BACKEND_URL && typeof window.SHADOWTWIN_BACKEND_URL === 'string') {
+    const trimmed = window.SHADOWTWIN_BACKEND_URL.trim().replace(/\/+$/, '');
+    if (trimmed) return trimmed;
+  }
+
+  return '';
+}
+
+const API = resolveBackend();
+const WS = (API ? API.replace(/^http/, 'ws') : location.origin.replace(/^http/, 'ws')) + '/ws';
 
 const CHANNELS = [
   ['rpm', 'Engine speed', 'rpm', 0],
@@ -642,7 +660,7 @@ function paint() {
       const r = live.engines && live.engines[side];
       if (!r) continue;
       const st = uiStatus(side);
-      const name = side === 'port' ? 'Port' : 'Starboard';
+      const name = side === 'port' ? 'Port (Left)' : 'Starboard (Right)';
 
       if (st === 'nominal') {
         items.push(`<div class="finding ok">
@@ -755,7 +773,7 @@ function paintDetail() {
   applyBarWidths();
 }
 
-const SIDE_NAME = { port: 'Port', starboard: 'Starboard' };
+const SIDE_NAME = { port: 'Port (Left)', starboard: 'Starboard (Right)' };
 
 /* ---------- view switching ---------- */
 

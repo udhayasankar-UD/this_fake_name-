@@ -1,4 +1,4 @@
-# AGENTS.md — project context for AI coding agents
+# AGENTS.md — shadow-twin project context for AI coding agents
 
 Read this fully before changing anything. It encodes decisions that took real
 debugging to arrive at; several "obvious improvements" here are regressions.
@@ -41,10 +41,12 @@ supports, say so before implementing it.
 ## 2. Repository map
 
 ```
-prototype/
+frontend/               # Deployed to Vercel (static web app)
   index.html            dashboard shell. NO inline <script>, NO inline style=
-  app.js                three.js viewer, websocket client, exploded view, callouts
+  app.js                three.js viewer, websocket & REST client, exploded view, callouts
+  config.js             backend endpoint configuration (window.SHADOWTWIN_BACKEND_URL)
   styles.css            design system + all styling
+  vercel.json           Vercel config: pinned CSP (Render domain only) + model caching
   vendor/               three.js r160 vendored (runs with zero internet)
     three/three.module.js
     addons/loaders/GLTFLoader.js
@@ -54,24 +56,32 @@ prototype/
     tapas.glb           airframe, 3 objects, 14,874 tris, 0.5 MB
     engine.glb          engine, 14 objects, 30,831 tris, 5.1 MB  (high tier)
     engine_low.glb      engine, 14 objects, 14,763 tris, 4.4 MB  (low/mid tier)
-  backend/
-    mvem.py             mean value engine model (the physics core)
-    dbc/engine.dbc      8 CAN messages, J1939 PGNs
-    can_bus.py          CAN encode/decode, socketcan or python-can virtual
-    trust.py            sensor trust gateway
-    detect.py           anomaly detection, fault classifier, RUL
-    twin.py             per-engine orchestration, confidence gate, correlation
-    server.py           simulated ECUs, FastAPI, websocket, static hosting
-    train.py            generates training data from physics, fits detectors
-    evaluate.py         severity sweep — reports where detection breaks
-    models.pkl          trained detector (regenerate with train.py)
-    requirements.txt
+backend/                # Deployed to Render (FastAPI web service)
+  mvem.py               mean value engine model (the physics core)
+  dbc/engine.dbc        8 CAN messages, J1939 PGNs
+  can_bus.py            CAN encode/decode, socketcan or python-can virtual
+  trust.py              sensor trust gateway
+  detect.py             anomaly detection, fault classifier, RUL
+  twin.py               per-engine orchestration, confidence gate, correlation
+  server.py             simulated ECUs, FastAPI, websocket, CORS, static hosting
+  train.py              generates training data from physics, fits detectors
+  evaluate.py           severity sweep — reports where detection breaks
+  models.pkl            trained detector (regenerate with train.py)
+  requirements.txt      pinned scikit-learn==1.8.0
+  render.yaml           Render deployment configuration
+server.py               Root convenience proxy (subprocess chdir into backend)
+main.py                 Root convenience entrypoint
+vercel.json             Root Vercel deployment redirect (outputDirectory: frontend)
+render.yaml             Root Render deployment blueprint (rootDir: backend)
 ```
 
-Run: `cd backend && pip install -r requirements.txt && python3 train.py && python3 server.py`
+Run backend locally: `cd backend && pip install -r requirements.txt && python train.py && python server.py`
 → http://localhost:8000
 
-Real bus instead of simulated ECUs: `AEROTWIN_CAN=vcan0 python3 server.py`.
+Or from repo root: `python server.py`
+Open frontend directly at http://localhost:8000 (backend serves frontend when present locally).
+
+Real bus instead of simulated ECUs: `SHADOWTWIN_CAN=vcan0 python server.py`.
 Nothing downstream of the decoder changes.
 
 ---
@@ -187,6 +197,7 @@ Therefore:
 - **No external origins.** No CDN, no Google Fonts. three.js is vendored so the
   whole thing runs offline — this matters for a defence demo on a network you
   don't control.
+- **Split deployment (Vercel + Render):** When frontend is deployed to Vercel and backend to Render, `vercel.json` pins `connect-src 'self' https://shadow-twin.onrender.com wss://shadow-twin.onrender.com`. Wildcard `http:`/`https:` is prohibited. Backend CORS uses `allow_origins=['*']` intentionally for the initial Render deploy, and should be tightened to `['https://shadow-twin.vercel.app']` once the frontend domain is confirmed.
 
 If a browser reports `default-src 'none'` blocking `styles.css`/`app.js`, that is
 **not** from this server (`curl -I http://localhost:8000/` to confirm). It is a
@@ -328,7 +339,7 @@ State these plainly; never paper over them.
   operating-point variation. **It is not a field validation.**
 - **The physics core is MVEM only.** The physics-informed (PINN) heat-balance loss
   term for CHT/EGT is designed but unimplemented. This is the main planned gap.
-- **RUL runs on an accelerated clock** (`AEROTWIN_TIME_SCALE`, default 120) so
+- **RUL runs on an accelerated clock** (`SHADOWTWIN_TIME_SCALE`, default 120) so
   trends are visible in a demo lasting minutes. It affects the RUL time axis only,
   never the physics, which always steps at real `dt`.
 
