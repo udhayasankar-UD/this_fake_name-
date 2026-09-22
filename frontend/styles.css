@@ -509,3 +509,46 @@ button:disabled:hover { background: transparent; }
     max-height: 190px;
   }
 }
+
+/* ---- Change 1: mission status banner ---- */
+.mission-banner {
+  padding: 12px 16px;
+  border-left: 3px solid;
+  margin: 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.mission-banner.nominal { border-left-color: var(--nominal); background: var(--nominal-bg); }
+.mission-banner.caution { border-left-color: var(--caution); background: var(--caution-bg); }
+.mission-banner.fault   { border-left-color: var(--fault);   background: var(--fault-bg);   }
+.mission-banner.unknown { border-left-color: var(--unknown); background: var(--unknown-bg); }
+.banner-status { display: block; font-size: 13px; font-weight: 500; letter-spacing: 0.06em; }
+.mission-banner.nominal .banner-status { color: var(--nominal); }
+.mission-banner.caution .banner-status { color: var(--caution); }
+.mission-banner.fault   .banner-status { color: var(--fault);   }
+.mission-banner.unknown .banner-status { color: var(--unknown); }
+.banner-reason { display: block; font-size: 12px; color: var(--ink-soft); margin-top: 3px; }
+
+/* ---- Change 2: baseline collection progress ---- */
+.baseline-progress { padding: 6px 0 2px; }
+.baseline-bar { height: 2px; background: var(--line); border-radius: 1px; overflow: hidden; }
+.baseline-fill { height: 100%; background: var(--unknown); border-radius: 1px; transition: width 1s linear; }
+.baseline-label { font-size: 11px; color: var(--ink-faint); margin-top: 3px; display: block; }
+
+/* ---- Change 5: health trend sparkline ---- */
+.engine-card { flex-wrap: wrap; }
+.sparkline-row { display: block; width: 100%; order: 3; margin-top: 4px; min-height: 0; }
+.sparkline-row:empty { display: none; }
+.sparkline { display: block; width: 100%; height: 20px; }
+.sparkline.nominal { color: var(--nominal); }
+.sparkline.caution { color: var(--caution); }
+.sparkline.fault   { color: var(--fault); }
+
+/* ---- Change 6: mission margin display ---- */
+.margin-display { display: flex; gap: 24px; padding: 4px 0 8px; }
+.margin-value { display: block; font-size: 28px; font-weight: 500; line-height: 1.1; }
+.margin-value.nominal { color: var(--nominal); }
+.margin-value.caution { color: var(--caution); }
+.margin-value.fault   { color: var(--fault); }
+.margin-value.unknown { color: var(--unknown); }
+.margin-value.secondary { font-size: 20px; }
+.margin-label { font-size: 11px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.04em; }

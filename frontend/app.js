@@ -256,8 +256,27 @@ const STATE_TEXT = {
   unknown: ['Not evaluated', 'Unsure']
 };
 
+/* ---- Change 3: auto-open on fault (fault only, never caution) ---- */
+let lastAutoNav = null;
+
+/* ---- Change 5: health trend sparkline ---- */
+const healthHistory = { port: [], starboard: [] };
+const HEALTH_HIST_MAX = 60;
+
+/* ---- Change 4: simplified finding cards — fault action map ---- */
+const FAULT_ACTION = {
+  injector_underflow:     'Check injector 3 delivery and common rail pressure',
+  cooling_degradation:    'Monitor CHT \u2014 reduce power if above 220\u00b0C',
+  lubrication_loss:       'Check oil level and pressure sensor \u2014 land if persistent',
+  turbo_underperformance: 'Monitor boost \u2014 reduce altitude demand',
+  combustion_instability: 'Reduce throttle \u2014 inspect fuel system post-flight',
+  ring_blowby:            'Reduce power \u2014 inspect cylinder sealing post-flight',
+  anomaly_unclassified:   'Unclassified anomaly \u2014 monitor all channels',
+};
+
 let live = null;
 let connected = false;
+let wsConnectedAt = null;
 
 function uiStatus(side) {
   if (!live || !live.engines || !live.engines[side]) return 'unknown';
@@ -269,6 +288,7 @@ function connect() {
   try { sock = new WebSocket(WS); } catch (e) { setTimeout(connect, 2000); return; }
   sock.onopen = () => {
     connected = true;
+    if (!wsConnectedAt) wsConnectedAt = Date.now();
     document.getElementById('hint').textContent = 'Drag to rotate';
   };
   sock.onmessage = ev => {
@@ -629,6 +649,166 @@ function applyBarWidths() {
   });
 }
 
+/* ---- Change 1: mission status banner ---- */
+function updateMissionBanner() {
+  const el = document.getElementById('mission-banner');
+  const statusEl = document.getElementById('banner-status');
+  const reasonEl = document.getElementById('banner-reason');
+  if (!el || !statusEl || !reasonEl) return;
+
+  let cls = 'unknown';
+  let label = 'EVALUATING';
+  let reason = 'Connecting to ground service\u2026';
+
+  if (live && live.engines) {
+    const port = live.engines.port;
+    const star = live.engines.starboard;
+    const pst = port ? port.status : 'not_evaluated';
+    const sst = star ? star.status : 'not_evaluated';
+
+    if (pst === 'fault' || sst === 'fault') {
+      cls = 'fault';
+      label = 'NO-GO';
+      const faultEng = pst === 'fault' ? port : star;
+      const side = pst === 'fault' ? 'Port' : 'Starboard';
+      reason = side + ' \u2014 ' + (faultEng.headline || 'Fault detected');
+    } else if (pst === 'caution' || pst === 'anomaly_unclassified' ||
+               sst === 'caution' || sst === 'anomaly_unclassified') {
+      cls = 'caution';
+      label = 'CAUTION';
+      const cautionEng = (pst === 'caution' || pst === 'anomaly_unclassified') ? port : star;
+      const side = (pst === 'caution' || pst === 'anomaly_unclassified') ? 'Port' : 'Starboard';
+      reason = side + ' \u2014 ' + (cautionEng.headline || 'Anomaly detected');
+    } else if (pst === 'not_evaluated' || sst === 'not_evaluated') {
+      cls = 'unknown';
+      label = 'EVALUATING';
+      reason = 'Collecting baseline \u2014 ready in ~35\u202fs';
+    } else {
+      // both nominal — check confidence
+      const pconf = port ? port.confidence : null;
+      const sconf = star ? star.confidence : null;
+      if (pconf !== null && sconf !== null && pconf >= 0.8 && sconf >= 0.8) {
+        cls = 'nominal';
+        label = 'GO';
+        reason = 'Both engines nominal';
+      } else if (pconf !== null && sconf !== null) {
+        cls = 'caution';
+        label = 'CAUTION';
+        reason = 'Confidence below threshold';
+      } else {
+        cls = 'unknown';
+        label = 'EVALUATING';
+        reason = 'Collecting baseline';
+      }
+    }
+
+    // append shared cause if correlation exists
+    const c = live.correlation;
+    if (c && c.kind === 'shared_cause') {
+      reason += ' \u2014 shared cause suspected';
+    }
+  }
+
+  for (const c of ['nominal', 'caution', 'fault', 'unknown'])
+    el.classList.toggle(c, c === cls);
+  statusEl.textContent = label;
+  reasonEl.textContent = reason;
+}
+
+/* ---- Change 2: baseline progress ---- */
+function updateBaseline(side) {
+  const rulEl = document.getElementById('rul-' + side);
+  if (!rulEl) return;
+  const r = live && live.engines && live.engines[side];
+  if (!r || r.status !== 'not_evaluated' || !wsConnectedAt) {
+    // remove baseline progress if present but no longer needed
+    const existing = rulEl.querySelector('.baseline-progress');
+    if (existing) existing.remove();
+    return;
+  }
+  let bp = rulEl.querySelector('.baseline-progress');
+  if (!bp) {
+    bp = document.createElement('div');
+    bp.className = 'baseline-progress';
+    bp.innerHTML = '<div class="baseline-bar"><div class="baseline-fill"></div></div>'
+      + '<span class="baseline-label">Ready in ~<span class="baseline-eta">40</span>\u202fs</span>';
+    rulEl.appendChild(bp);
+  }
+  const elapsed = (Date.now() - wsConnectedAt) / 1000;
+  const pct = Math.min(100, elapsed / 40 * 100);
+  const eta = Math.max(0, Math.round(40 - elapsed));
+  const fill = bp.querySelector('.baseline-fill');
+  const etaEl = bp.querySelector('.baseline-eta');
+  if (fill) fill.style.width = pct + '%';
+  if (etaEl) etaEl.textContent = eta;
+}
+
+/* ---- Change 5: sparkline renderer ---- */
+function renderSparkline(data) {
+  if (!data || data.length < 5) return '';
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 0.01;
+  const w = 80;
+  const h = 20;
+  const points = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * w;
+    const y = h - ((v - min) / range) * (h - 2) - 1;
+    return x.toFixed(1) + ',' + y.toFixed(1);
+  }).join(' ');
+
+  let cls = 'nominal';
+  if (data.some(v => v < 0.4)) cls = 'fault';
+  else if (data.some(v => v < 0.7)) cls = 'caution';
+
+  return '<svg class="sparkline ' + cls + '" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">'
+    + '<polyline points="' + points + '" fill="none" stroke="currentColor" stroke-width="1.5" />'
+    + '</svg>';
+}
+
+/* ---- Change 6: mission margin ---- */
+function updateMissionMargin() {
+  const pairEl = document.getElementById('margin-pair-val');
+  const outEl = document.getElementById('margin-out-val');
+  if (!pairEl || !outEl) return;
+
+  const m = live?.mission;
+
+  // pair margin
+  const pairH = m?.pair_margin_hours;
+  if (pairH != null && pairH > 0) {
+    pairEl.textContent = '+' + Math.round(pairH) + '\u202fh';
+    const cls = pairH > 2 ? 'nominal' : 'caution';
+    for (const c of ['nominal', 'caution', 'fault', 'unknown'])
+      pairEl.classList.toggle(c, c === cls);
+  } else if (pairH != null && pairH <= 0) {
+    pairEl.textContent = '\u2014';
+    for (const c of ['nominal', 'caution', 'fault', 'unknown'])
+      pairEl.classList.toggle(c, c === 'fault');
+  } else {
+    pairEl.textContent = '\u2014';
+    for (const c of ['nominal', 'caution', 'fault', 'unknown'])
+      pairEl.classList.toggle(c, c === 'unknown');
+  }
+
+  // engine-out margin
+  const outH = m?.engine_out_margin_hours;
+  if (outH != null && outH > 0) {
+    outEl.textContent = '+' + Math.round(outH) + '\u202fh';
+    const cls = outH > 2 ? 'nominal' : 'caution';
+    for (const c of ['nominal', 'caution', 'fault', 'unknown'])
+      outEl.classList.toggle(c, c === cls);
+  } else if (outH != null && outH <= 0) {
+    outEl.textContent = '\u2014';
+    for (const c of ['nominal', 'caution', 'fault', 'unknown'])
+      outEl.classList.toggle(c, c === 'fault');
+  } else {
+    outEl.textContent = '\u2014';
+    for (const c of ['nominal', 'caution', 'fault', 'unknown'])
+      outEl.classList.toggle(c, c === 'unknown');
+  }
+}
+
 /* ---------- painting ---------- */
 
 function paint() {
@@ -649,8 +829,47 @@ function paint() {
       const r = live && live.engines && live.engines[side];
       rulEl.innerHTML = renderRulStrip(r);
     }
+
+    // Change 2: baseline progress
+    updateBaseline(side);
+
+    // Change 5: sparkline — push to history and render
+    if (live && live.engines && live.engines[side]) {
+      const r = live.engines[side];
+      if (r.status !== 'not_evaluated' && r.confidence !== null) {
+        const h = 1 - (r.severity || 0);
+        healthHistory[side].push(h);
+        if (healthHistory[side].length > HEALTH_HIST_MAX)
+          healthHistory[side].shift();
+      }
+    }
+    const sparkEl = document.getElementById('spark-' + side);
+    if (sparkEl) {
+      sparkEl.innerHTML = renderSparkline(healthHistory[side]);
+    }
   }
 
+  // Change 3: auto-open engine on fault (fault only, never caution)
+  if (live && live.engines) {
+    const faultSide = ['port', 'starboard'].find(s =>
+      live.engines[s] && live.engines[s].status === 'fault' && uiStatus(s) === 'fault');
+    if (faultSide && faultSide !== lastAutoNav && view === 'aircraft') {
+      lastAutoNav = faultSide;
+      openEngine(faultSide);
+    } else if (!faultSide) {
+      lastAutoNav = null;
+    }
+  }
+
+  // Change 7: stage-head subtitle update
+  if (view === 'aircraft') {
+    const hasFault = ['port', 'starboard'].some(s => uiStatus(s) === 'fault');
+    document.getElementById('stage-sub').textContent = hasFault
+      ? 'Tap the affected engine \u2014 fault detected'
+      : 'Select an engine to inspect';
+  }
+
+  // Change 4: simplified finding cards for aircraft view
   const box = document.getElementById('findings');
   if (!live) {
     box.innerHTML = '<p class="empty">Waiting for the ground service\u2026</p>';
@@ -667,9 +886,19 @@ function paint() {
           <div class="t">${name} \u2014 Nominal</div>
           <div class="d">Measurements track the physics model across all trusted channels.</div>
           ${renderConfBar(r.confidence, 'nominal')}</div>`);
-      } else {
+      } else if (st === 'fault' || st === 'caution') {
+        // Change 4: simplified card — action text, no sigma values
+        const severityWord = st === 'fault' ? 'Action required' : 'Monitor';
+        const action = FAULT_ACTION[r.fault] || 'Inspect before next sortie';
+        const confText = r.confidence !== null ? Math.round(r.confidence * 100) + '% confidence' : '';
         items.push(`<div class="finding ${st}">
           <div class="t">${name} \u2014 ${r.headline}</div>
+          <div class="d">${severityWord} \u00b7 ${action}</div>
+          ${confText ? '<div class="conf">' + confText + '</div>' : ''}
+          ${renderConfBar(r.confidence, st)}</div>`);
+      } else {
+        items.push(`<div class="finding ${st}">
+          <div class="t">${name} \u2014 ${r.headline || 'Not evaluated'}</div>
           <div class="d">${r.detail || ''}</div>
           ${renderConfBar(r.confidence, st)}</div>`);
       }
@@ -691,6 +920,10 @@ function paint() {
       ? items.join('')
       : '<p class="empty">Waiting for data\u2026</p>';
   }
+
+  // Change 1 + 6: mission banner and margin
+  updateMissionBanner();
+  updateMissionMargin();
 
   applyBarWidths();
   if (view === 'engine' && selected) paintDetail();

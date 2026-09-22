@@ -52,6 +52,11 @@
       <p id="side-sub">Twin engine, live telemetry</p>
     </div>
 
+    <div id="mission-banner" class="mission-banner unknown">
+      <span class="banner-status" id="banner-status">EVALUATING</span>
+      <span class="banner-reason" id="banner-reason">Collecting baseline</span>
+    </div>
+
     <div class="section" id="sec-engines">
       <h3>Engines</h3>
       <div class="engine-entry">
@@ -64,6 +69,7 @@
             <span class="state" id="state-port">Not evaluated</span>
           </span>
           <span class="pill unknown" id="pill-port">Unsure</span>
+          <div class="sparkline-row" id="spark-port"></div>
         </button>
         <div class="engine-rul" id="rul-port"></div>
       </div>
@@ -77,8 +83,23 @@
             <span class="state" id="state-starboard">Not evaluated</span>
           </span>
           <span class="pill unknown" id="pill-starboard">Unsure</span>
+          <div class="sparkline-row" id="spark-starboard"></div>
         </button>
         <div class="engine-rul" id="rul-starboard"></div>
+      </div>
+    </div>
+
+    <div class="section" id="sec-margin">
+      <h3>Mission margin</h3>
+      <div class="margin-display">
+        <div class="margin-pair">
+          <span class="margin-value unknown" id="margin-pair-val">—</span>
+          <span class="margin-label">hours pair margin</span>
+        </div>
+        <div class="margin-out">
+          <span class="margin-value secondary unknown" id="margin-out-val">—</span>
+          <span class="margin-label">engine-out margin</span>
+        </div>
       </div>
     </div>
 
