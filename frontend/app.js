@@ -290,6 +290,7 @@ function connect() {
     connected = true;
     if (!wsConnectedAt) wsConnectedAt = Date.now();
     document.getElementById('hint').textContent = 'Drag to rotate';
+    handOverToLive();
   };
   sock.onmessage = ev => {
     try { live = JSON.parse(ev.data); } catch (e) { return; }
@@ -297,10 +298,101 @@ function connect() {
   };
   sock.onclose = () => {
     connected = false;
-    document.getElementById('hint').textContent = 'Backend not connected';
+    if (!demoTimer) document.getElementById('hint').textContent = 'Backend not connected';
     setTimeout(connect, 2000);
   };
   sock.onerror = () => { try { sock.close(); } catch (e) { } };
+}
+
+/* ---------- cold-start handling ----------
+   The backend runs on free hosting that sleeps when idle; the first request
+   after a sleep can take minutes. Two things keep the page useful meanwhile:
+   1. a wake-up ping to /health the moment the page loads, and
+   2. if the backend is not connected after DEMO_AFTER_MS, replay frames that
+      were recorded from the real backend (demo-data.json) so every panel and
+      the Simulate buttons work. The badge and banner say plainly that this is a
+      recording. When the live socket connects, the page switches to it. */
+
+const DEMO_AFTER_MS = 3500;
+const PAGE_START = Date.now();
+let backendAwake = false;
+let demoData = null;
+let demoTimer = null;
+let demo = null;            // { name, idx } while replaying
+let lastSim = 'clear';      // last Simulate button pressed, re-applied on hand-over
+
+async function pingBackend() {
+  for (let i = 0; i < 150 && !connected; i++) {
+    let ctl = null, to = null;
+    try {
+      ctl = new AbortController();
+      to = setTimeout(() => ctl.abort(), 15000);
+      const r = await fetch((API || '') + '/health', { cache: 'no-store', signal: ctl.signal });
+      if (r.ok) { backendAwake = true; updateWakeBanner(); return; }
+    } catch (e) { /* still asleep or waking */ }
+    finally { if (to) clearTimeout(to); }
+    await new Promise(res => setTimeout(res, 2000));
+  }
+}
+
+function updateWakeBanner() {
+  const el = document.getElementById('wake-banner');
+  if (!el) return;
+  if (connected || !demoTimer) { el.classList.add('hidden'); return; }
+  const s = Math.round((Date.now() - PAGE_START) / 1000);
+  el.querySelector('.wake-text').textContent = backendAwake
+    ? 'Live backend is up, connecting… showing a recording until it is ready.'
+    : 'Waking the live backend (free hosting sleeps when idle, this can take a few minutes). '
+      + 'Showing a recording of its real output; live data takes over automatically.';
+  el.querySelector('.wake-time').textContent = s + ' s';
+  el.classList.remove('hidden');
+}
+
+async function startDemo() {
+  if (connected || demoTimer) return;
+  if (!demoData) {
+    try { demoData = await (await fetch('demo-data.json')).json(); } catch (e) { return; }
+  }
+  if (connected || demoTimer || !demoData) return;
+  demo = { name: 'clear', idx: 0 };
+  demoTimer = setInterval(demoTick, demoData.interval_ms || 400);
+  demoTick();
+  updateWakeBanner();
+  document.getElementById('hint').textContent = 'Drag to rotate';
+}
+
+function demoTick() {
+  if (connected || !demo || !demoData) return;
+  const sc = demoData.scenarios[demo.name];
+  if (!sc) return;
+  live = Object.assign({}, sc.frames[demo.idx], { ts: Date.now() / 1000 });
+  demo.idx += 1;
+  if (demo.idx >= sc.frames.length) demo.idx = sc.loop_from || 0;
+  paint();
+}
+
+function handOverToLive() {
+  if (!demoTimer) return;
+  clearInterval(demoTimer);
+  demoTimer = null;
+  demo = null;
+  live = null;
+  updateWakeBanner();
+  // keep whatever scenario the viewer picked while they were on the recording
+  if (lastSim !== 'clear') runSim(lastSim);
+}
+
+/* One place for the Simulate buttons: live backend when connected, else the recording. */
+async function runSim(kind) {
+  lastSim = kind;
+  if (!connected) {
+    if (demo && demoData && demoData.scenarios[kind]) demo = { name: kind, idx: 0 };
+    return;
+  }
+  if (kind === 'clear') { await inject('both', null); return; }
+  if (kind === 'injector') { await inject('both', null); await inject('port', 'injector_underflow', 0.8); return; }
+  if (kind === 'sensor') { await inject('both', null); await inject('starboard', 'sensor_stuck'); return; }
+  if (kind === 'systemic') { await inject('both', 'turbo_underperformance', 0.75); return; }
 }
 
 async function inject(side, fault, severity) {
@@ -500,6 +592,11 @@ function updateLiveBadge() {
   const el = document.getElementById('live-badge');
   if (!el) return;
   if (!connected) {
+    if (demoTimer) {
+      el.className = 'live-badge demo';
+      el.textContent = '\u25cf Recorded demo';
+      return;
+    }
     el.className = 'live-badge offline';
     el.textContent = '\u25cf Offline';
     return;
@@ -1107,13 +1204,7 @@ document.getElementById('stab-findings').onclick = () => setInfoTab('findings');
 document.getElementById('stab-readings').onclick = () => setInfoTab('readings');
 
 document.querySelectorAll('[data-sim]').forEach(btn => {
-  btn.onclick = async () => {
-    const kind = btn.dataset.sim;
-    if (kind === 'clear') { await inject('both', null); return; }
-    if (kind === 'injector') { await inject('both', null); await inject('port', 'injector_underflow', 0.8); return; }
-    if (kind === 'sensor') { await inject('both', null); await inject('starboard', 'sensor_stuck'); return; }
-    if (kind === 'systemic') { await inject('both', 'turbo_underperformance', 0.75); return; }
-  };
+  btn.onclick = () => runSim(btn.dataset.sim);
 });
 
 document.getElementById('parts').addEventListener('click', e => {
@@ -1126,3 +1217,6 @@ document.getElementById('parts').addEventListener('click', e => {
 
 paint();
 connect();
+pingBackend();
+setTimeout(startDemo, DEMO_AFTER_MS);
+setInterval(updateWakeBanner, 1000);

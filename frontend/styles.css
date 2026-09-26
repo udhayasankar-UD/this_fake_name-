@@ -299,6 +299,29 @@ button:disabled:hover { background: transparent; }
 .live-badge.live    { color: var(--nominal); background: var(--nominal-bg); }
 .live-badge.stale   { color: var(--caution); background: var(--caution-bg); }
 .live-badge.offline { color: var(--unknown); background: var(--unknown-bg); }
+.live-badge.demo    { color: var(--caution); background: var(--caution-bg); }
+
+/* cold-start banner: shown while the free-tier backend wakes up */
+.wake-banner {
+  position: fixed;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  z-index: 50;
+  max-width: min(720px, calc(100vw - 24px));
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  padding: 8px 14px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ink);
+  background: var(--caution-bg);
+  border: 1px solid var(--caution);
+  border-radius: var(--radius);
+}
+.wake-banner .wake-time { color: var(--ink-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.wake-banner.hidden { display: none; }
 
 /* ---- side-head layout row (title + live badge) ---- */
 .side-head-row {

@@ -205,6 +205,13 @@ async def _startup():
     asyncio.create_task(station.run())
 
 
+@app.api_route('/health', methods=['GET', 'HEAD'])
+async def health():
+    """Instant liveness probe. Used by the UptimeRobot keep-alive ping and by the
+    frontend wake-up ping. Deliberately does no work."""
+    return {'status': 'ok', 'ready': bool(station.latest)}
+
+
 @app.get('/api/state')
 async def state():
     return JSONResponse(station.latest or {'status': 'starting'})
