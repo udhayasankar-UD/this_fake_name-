@@ -1215,6 +1215,59 @@ document.getElementById('parts').addEventListener('click', e => {
 });
 
 
+/* ---------- first-run guide ---------- */
+
+const TOUR_KEY = 'shadowtwin_tour_seen_v1';
+const tourSlides = Array.from(document.querySelectorAll('.tour-slide'));
+const tourOverlay = document.getElementById('tour-overlay');
+const tourDots = document.getElementById('tour-dots');
+const tourNext = document.getElementById('tour-next');
+const tourSkip = document.getElementById('tour-skip');
+const tourClose = document.getElementById('tour-close');
+const tourDontShow = document.getElementById('tour-dontshow-final');
+let tourIdx = 0;
+
+tourSlides.forEach((_, i) => {
+  const d = document.createElement('span');
+  d.className = 'dot';
+  tourDots.appendChild(d);
+});
+
+function renderTour() {
+  tourSlides.forEach((s, i) => s.classList.toggle('active', i === tourIdx));
+  Array.from(tourDots.children).forEach((d, i) => d.classList.toggle('active', i === tourIdx));
+  tourNext.textContent = tourIdx === tourSlides.length - 1 ? 'Get started' : 'Next';
+}
+
+function openTour() {
+  tourIdx = 0;
+  renderTour();
+  tourOverlay.classList.remove('hidden');
+}
+
+function closeTour() {
+  tourOverlay.classList.add('hidden');
+  if (tourDontShow.checked) {
+    try { localStorage.setItem(TOUR_KEY, '1'); } catch (e) { /* private window etc. */ }
+  }
+}
+
+tourNext.onclick = () => {
+  if (tourIdx < tourSlides.length - 1) { tourIdx += 1; renderTour(); }
+  else closeTour();
+};
+tourSkip.onclick = closeTour;
+tourClose.onclick = closeTour;
+document.getElementById('btn-help').onclick = openTour;
+tourOverlay.addEventListener('click', e => { if (e.target === tourOverlay) closeTour(); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !tourOverlay.classList.contains('hidden')) closeTour();
+});
+
+let tourSeen = false;
+try { tourSeen = localStorage.getItem(TOUR_KEY) === '1'; } catch (e) { /* private window etc. */ }
+if (!tourSeen) openTour();
+
 paint();
 connect();
 pingBackend();

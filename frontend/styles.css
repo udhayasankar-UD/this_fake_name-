@@ -323,6 +323,128 @@ button:disabled:hover { background: transparent; }
 .wake-banner .wake-time { color: var(--ink-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .wake-banner.hidden { display: none; }
 
+/* ---- help button ---- */
+.help-btn {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+.help-btn:hover { color: var(--ink); border-color: var(--ink-soft); }
+
+/* ---- first-run guide overlay ---- */
+.tour-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(42, 46, 51, 0.45);
+  padding: 20px;
+}
+.tour-overlay.hidden { display: none; }
+
+.tour-card {
+  position: relative;
+  width: min(480px, 100%);
+  background: var(--panel);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  padding: 28px 28px 20px;
+}
+
+.tour-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  border: none;
+  background: none;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--ink-faint);
+  cursor: pointer;
+  padding: 4px;
+}
+.tour-close:hover { color: var(--ink); }
+
+.tour-slides { position: relative; min-height: 170px; }
+.tour-slide { display: none; }
+.tour-slide.active { display: block; }
+
+.tour-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0 0 6px;
+}
+.tour-slide h2 {
+  font-size: 18px;
+  margin: 0 0 10px;
+  color: var(--ink);
+}
+.tour-slide p {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  margin: 0;
+}
+.tour-slide strong { color: var(--ink); font-weight: 600; }
+
+.tour-dontshow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.tour-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line-soft);
+}
+.tour-dots { display: flex; gap: 6px; }
+.tour-dots .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--line);
+}
+.tour-dots .dot.active { background: var(--ink-soft); }
+
+.tour-nav { display: flex; gap: 10px; }
+.tour-btn {
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--panel);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 7px 16px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.tour-btn.ghost {
+  background: none;
+  color: var(--ink-soft);
+  border-color: transparent;
+}
+.tour-btn.ghost:hover { color: var(--ink); }
+
 /* ---- side-head layout row (title + live badge) ---- */
 .side-head-row {
   display: flex;

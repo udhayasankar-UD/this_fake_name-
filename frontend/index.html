@@ -47,6 +47,7 @@
     <div class="side-head">
       <div class="side-head-row">
         <h2 id="side-title">Propulsion status</h2>
+        <button class="help-btn" id="btn-help" title="How to use this demo" aria-label="How to use this demo">?</button>
         <span class="live-badge offline" id="live-badge">● Offline</span>
       </div>
       <p id="side-sub">Twin engine, live telemetry</p>
@@ -130,6 +131,69 @@
   <span class="wake-text"></span>
   <span class="wake-time"></span>
 </div>
+
+<div class="tour-overlay hidden" id="tour-overlay" role="dialog" aria-modal="true" aria-labelledby="tour-title">
+  <div class="tour-card">
+    <button class="tour-close" id="tour-close" aria-label="Close guide">&times;</button>
+    <div class="tour-slides" id="tour-slides">
+
+      <div class="tour-slide" data-slide="0">
+        <p class="tour-eyebrow">Shadow Twin &mdash; quick guide</p>
+        <h2 id="tour-title">A digital twin for a twin-engine UAV</h2>
+        <p>This dashboard runs a live physics model of both engines side by side with
+           simulated real telemetry, and flags the moment either one drifts from what
+           the model expects. Four short steps show you around.</p>
+      </div>
+
+      <div class="tour-slide" data-slide="1">
+        <p class="tour-eyebrow">Step 1 of 4</p>
+        <h2>The aircraft view</h2>
+        <p>The 3D model on the left is the aircraft. Drag to rotate, scroll to zoom.
+           Click either engine card on the right &mdash; <strong>Port (Left)</strong> or
+           <strong>Starboard (Right)</strong> &mdash; to fly in and inspect that engine's
+           components up close.</p>
+      </div>
+
+      <div class="tour-slide" data-slide="2">
+        <p class="tour-eyebrow">Step 2 of 4</p>
+        <h2>Status, RUL and mission margin</h2>
+        <p>Each engine card shows a live status (Nominal / Watch / Fault) and a
+           remaining-useful-life strip once enough baseline has been collected.
+           <strong>Mission margin</strong> below combines both engines into a single
+           go / no-go call for the current sortie.</p>
+      </div>
+
+      <div class="tour-slide" data-slide="3">
+        <p class="tour-eyebrow">Step 3 of 4</p>
+        <h2>Findings &amp; Readings</h2>
+        <p>Open an engine to see the floating panel in the 3D view: <strong>Findings</strong>
+           explains what's wrong in plain language and which component is affected;
+           <strong>Readings</strong> shows the raw sensor channels next to what the physics
+           model expected, so you can see exactly why a finding was raised.</p>
+      </div>
+
+      <div class="tour-slide" data-slide="4">
+        <p class="tour-eyebrow">Step 4 of 4</p>
+        <h2>Try it &mdash; Simulate a fault</h2>
+        <p>Use the <strong>Simulate</strong> panel to inject a fault &mdash; an injector
+           problem, a stuck sensor, or both engines drifting &mdash; and watch detection,
+           findings and mission margin update within a few seconds. <strong>Clear</strong>
+           resets to nominal. If the live backend is still waking up, you'll see this
+           running on a recording of real backend output until it connects.</p>
+        <label class="tour-dontshow"><input type="checkbox" id="tour-dontshow-final" checked /> Don't show this again</label>
+      </div>
+
+    </div>
+    <div class="tour-foot">
+      <div class="tour-dots" id="tour-dots"></div>
+      <div class="tour-nav">
+        <button class="tour-btn ghost" id="tour-skip">Skip</button>
+        <button class="tour-btn" id="tour-next">Next</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="config.js"></script>
 <script type="module" src="app.js"></script>
 </body>
