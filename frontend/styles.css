@@ -504,6 +504,8 @@ button:disabled:hover { background: transparent; }
   border: 2px solid var(--nominal);
   animation: nacelle-pulse 1.6s ease-out infinite;
   opacity: 0;
+  pointer-events: auto;
+  cursor: pointer;
 }
 .nacelle-ring--delay { animation-delay: 0.8s; }
 @keyframes nacelle-pulse {
@@ -523,6 +525,8 @@ button:disabled:hover { background: transparent; }
   padding: 2px 8px;
   border-radius: 99px;
   letter-spacing: 0.03em;
+  pointer-events: auto;
+  cursor: pointer;
 }
 
 /* ---- side-head layout row (title + live badge) ---- */

@@ -1219,7 +1219,7 @@ document.getElementById('parts').addEventListener('click', e => {
 
 /* ---------- spotlight guide ---------- */
 
-const TOUR_KEY = 'shadowtwin_tour_seen_v2';
+const TOUR_KEY = 'shadowtwin_tour_seen_v4';
 
 /* ---- Aircraft-view steps ---- */
 const AIRCRAFT_STEPS = [
@@ -1230,72 +1230,70 @@ const AIRCRAFT_STEPS = [
     title: 'A digital twin for a twin-engine UAV',
     body: 'This dashboard runs a live physics model of both engines side by side with ' +
           'real telemetry, and flags the moment either one drifts from what the model expects. ' +
-          'Six short steps show you around.',
+          'Let\u2019s walk through the key features.',
     showDontShow: false,
     type: 'normal'
   },
   {
     targetId: 'viewport',
     place: 'right',
-    eyebrow: 'Step 1 of 6 \u2014 3D View',
-    title: 'The aircraft model',
+    eyebrow: 'Aircraft Step 1 of 6 \u2014 3D View',
+    title: 'The UAV airframe',
     body: '<strong>Drag</strong> to rotate, <strong>scroll</strong> to zoom. ' +
-          'The twin nacelles on each wing are the engines. In the next step you\'ll click one.',
-    showDontShow: false,
-    type: 'normal'
-  },
-  {
-    targetId: 'viewport',
-    place: 'right',
-    eyebrow: 'Step 2 of 6 \u2014 Engine Selection',
-    title: 'Click an engine nacelle to inspect it',
-    body: 'The pulsing rings mark the engine nacelles. <strong>Click either one</strong> ' +
-          '(or click an engine card on the right) to fly inside and inspect the engine.',
-    showDontShow: false,
-    type: 'click-engine'   // Next hidden; advances automatically when openEngine() fires
-  },
-  {
-    targetId: 'sec-engines',
-    place: 'left',
-    eyebrow: 'Step 3 of 6 \u2014 Engine Cards',
-    title: 'Port & Starboard engine status',
-    body: 'Each card shows live status (<strong>Nominal / Watch / Fault</strong>), ' +
-          'a health sparkline trend, and remaining-useful-life once the baseline fills. ' +
-          'Click a card to open the engine detail view.',
+          'The twin nacelles on each wing house the 2.2\u202fL aero-diesel powerplants.',
     showDontShow: false,
     type: 'normal'
   },
   {
     targetId: 'mission-banner',
     place: 'left',
-    eyebrow: 'Step 4 of 6 \u2014 Mission Status',
-    title: 'Go / No-Go banner',
-    body: 'Combines both engines into a single <strong>GO / CAUTION / NO-GO</strong> call ' +
-          'for the current sortie. Pair margin and engine-out margin are shown below.',
+    eyebrow: 'Aircraft Step 2 of 6 \u2014 Go / No-Go Banner',
+    title: 'Mission status at a glance',
+    body: 'Combines health across both engines into a single operational call: ' +
+          '<strong>GO</strong>, <strong>CAUTION</strong>, or <strong>NO-GO</strong>. ' +
+          'If it says GO, the aircraft is safe to fly. CAUTION warns of emerging drift, and NO-GO marks critical degradation.',
     showDontShow: false,
     type: 'normal'
   },
   {
-    targetId: 'stage-infobar',
-    place: 'right',
-    eyebrow: 'Step 5 of 6 \u2014 Findings panel',
-    title: 'Findings & Readings',
-    body: '<strong>Findings</strong> explains what\'s wrong in plain language. ' +
-          '<strong>Readings</strong> shows every sensor channel next to what the physics model ' +
-          'expected \u2014 so you can see exactly why a finding was raised.',
+    targetId: 'sec-engines',
+    place: 'left',
+    eyebrow: 'Aircraft Step 3 of 6 \u2014 Engine Status',
+    title: 'Port & Starboard engines',
+    body: 'Each card shows live status (<strong>Nominal / Caution / Fault</strong>), ' +
+          'health sparkline trend, and remaining useful life. You can monitor whether one or both engines are degrading.',
+    showDontShow: false,
+    type: 'normal'
+  },
+  {
+    targetId: 'sec-margin',
+    place: 'left',
+    eyebrow: 'Aircraft Step 4 of 6 \u2014 Mission Margin',
+    title: 'Sortie endurance margins',
+    body: '<strong>Hours pair margin</strong> shows how many flight hours both engines together can sustain before hitting limits. ' +
+          '<strong>Engine-out margin</strong> shows endurance if one engine failed.',
     showDontShow: false,
     type: 'normal'
   },
   {
     targetId: 'sec-simulate',
     place: 'left',
-    eyebrow: 'Step 6 of 6 \u2014 Simulate',
-    title: 'Inject a fault to try it out',
-    body: 'Pick <strong>Injector fault</strong>, <strong>Sensor fault</strong>, or ' +
-          '<strong>Both engines drift</strong> and watch detection update within seconds. ' +
-          '<strong>Clear</strong> resets to nominal.',
-    showDontShow: true,
+    eyebrow: 'Aircraft Step 5 of 6 \u2014 Simulate',
+    title: 'Live fault injection',
+    body: 'Test how the twin responds. Inject an <strong>Injector fault</strong>, <strong>Sensor fault</strong>, or ' +
+          '<strong>Both engines drift</strong> to see live detection and mission margins update. <strong>Clear</strong> resets to nominal.',
+    showDontShow: false,
     type: 'normal'
+  },
+  {
+    targetId: 'viewport',
+    place: 'right',
+    eyebrow: 'Aircraft Step 6 of 6 \u2014 Engine Inspection',
+    title: 'Click an engine nacelle to fly inside',
+    body: 'The pulsing rings mark the engine nacelles. <strong>Click either engine nacelle</strong> ' +
+          '(or click an engine card on the right) to fly inside and inspect the engine internals!',
+    showDontShow: false,
+    type: 'click-engine'   // Next hidden; advances automatically when openEngine() fires
   }
 ];
 
@@ -1307,15 +1305,40 @@ const ENGINE_STEPS = [
     eyebrow: 'Engine view',
     title: 'You\u2019re inside the engine',
     body: 'The 3D model now shows the engine internals. Flagged components are tinted ' +
-          '\u2014 red for fault, amber for caution. Six more steps walk through every panel.',
+          '\u2014 red for fault, amber for caution. Eight steps walk through every panel on the right.',
+    showDontShow: false,
+    type: 'normal'
+  },
+  {
+    targetId: 'mission-banner',
+    place: 'left',
+    eyebrow: 'Engine step 1 of 8 \u2014 Go / No-Go',
+    title: 'Mission status at a glance',
+    body: 'This banner gives the single most important answer: <strong>GO</strong>, ' +
+          '<strong>CAUTION</strong>, or <strong>NO-GO</strong>. It combines the health ' +
+          'of both engines and the remaining mission margin into one call. ' +
+          'If it says GO, the aircraft is safe to continue. CAUTION means watch closely. ' +
+          'NO-GO means at least one engine has reached a fault threshold.',
+    showDontShow: false,
+    type: 'normal'
+  },
+  {
+    targetId: 'sec-engines',
+    place: 'left',
+    eyebrow: 'Engine step 2 of 8 \u2014 Engine cards',
+    title: 'Port & Starboard engine status',
+    body: 'Each card shows the per-engine health state, remaining-useful-life strip, ' +
+          'and a confidence pill. <strong>Nominal</strong> means the twin sees no drift. ' +
+          '<strong>Caution</strong> means a trend is forming. <strong>Fault</strong> means ' +
+          'a classified fault has been detected above the confidence threshold.',
     showDontShow: false,
     type: 'normal'
   },
   {
     targetId: 'panel-findings',
     place: 'right',
-    eyebrow: 'Engine step 1 of 6 \u2014 Findings',
-    title: 'What\'s wrong and why',
+    eyebrow: 'Engine step 3 of 8 \u2014 Findings',
+    title: 'What\u2019s wrong and why',
     body: '<strong>Findings</strong> names the fault in plain language, which component ' +
           'is affected, and the confidence level. Sensor faults are listed separately ' +
           'so they are never confused with engine problems.',
@@ -1325,7 +1348,7 @@ const ENGINE_STEPS = [
   {
     targetId: 'panel-readings',
     place: 'right',
-    eyebrow: 'Engine step 2 of 6 \u2014 Readings',
+    eyebrow: 'Engine step 4 of 8 \u2014 Readings',
     title: 'Sensor vs physics model',
     body: 'Every sensor channel shows its <strong>measured value</strong> alongside what ' +
           'the physics model expected. The delta tells you exactly how far the engine has ' +
@@ -1336,42 +1359,42 @@ const ENGINE_STEPS = [
   {
     targetId: 'sec-parts',
     place: 'left',
-    eyebrow: 'Engine step 3 of 6 \u2014 Components',
+    eyebrow: 'Engine step 5 of 8 \u2014 Components',
     title: 'Flagged components',
     body: 'Click any component here to zoom the 3D view onto it. <strong>Fault</strong> ' +
-          'parts glow brick-red; <strong>Caution</strong> parts amber. When nothing is ' +
-          'wrong all components stay neutral.',
+          'parts highlight in brick-red; <strong>Caution</strong> parts in amber. ' +
+          'When the engine is healthy all components stay neutral grey.',
     showDontShow: false,
     type: 'normal'
   },
   {
     targetId: 'sec-margin',
     place: 'left',
-    eyebrow: 'Engine step 4 of 6 \u2014 Mission margin',
+    eyebrow: 'Engine step 6 of 8 \u2014 Mission margin',
     title: 'How long can the aircraft keep flying?',
-    body: '<strong>Hours pair margin</strong> is how many hours both engines together can ' +
-          'sustain before one reaches its degradation limit. ' +
-          '<strong>Engine-out margin</strong> is the same figure if one engine is already ' +
-          'lost. Both update live as the twin runs.',
+    body: '<strong>Hours pair margin</strong> \u2014 how many flight hours both engines ' +
+          'together can sustain before hitting a degradation limit. ' +
+          '<strong>Engine-out margin</strong> \u2014 the same calculation assuming one ' +
+          'engine is already lost. Both update live as the twin runs.',
     showDontShow: false,
     type: 'normal'
   },
   {
     targetId: 'sec-extra-wrap',
     place: 'left',
-    eyebrow: 'Engine step 5 of 6 \u2014 Projection',
+    eyebrow: 'Engine step 7 of 8 \u2014 Projection',
     title: 'Remaining useful life & trend',
     body: '<strong>Projection</strong> shows the remaining-useful-life estimate with a ' +
-          'P10\u2013P90 confidence band, based on the degradation rate the twin is currently ' +
-          'tracking. It is not field-validated; it is driven by the physics model and the ' +
-          'seeded fault severity. Treat it as a relative indicator, not a hard limit.',
+          'P10\u2013P90 confidence band, driven by the degradation rate the twin is ' +
+          'currently tracking. This is a model-based indicator, not a field-validated ' +
+          'number. Treat it as a relative trend, not a hard maintenance limit.',
     showDontShow: false,
     type: 'normal'
   },
   {
     targetId: 'sec-simulate',
     place: 'left',
-    eyebrow: 'Engine step 6 of 6 \u2014 Simulate',
+    eyebrow: 'Engine step 8 of 8 \u2014 Simulate',
     title: 'Inject a fault to try it out',
     body: 'Pick <strong>Injector fault</strong>, <strong>Sensor fault</strong>, or ' +
           '<strong>Both engines drift</strong> and watch detection, findings and mission ' +
@@ -1452,6 +1475,7 @@ function hideNacelleOverlay() {
 function positionTour() {
   const steps = currentSteps();
   const step  = steps[tourIdx];
+  if (!step) return;
 
   /* text */
   document.getElementById('tour-eyebrow').textContent   = step.eyebrow;
@@ -1460,10 +1484,10 @@ function positionTour() {
   tourDontWrap.classList.toggle('hidden', !step.showDontShow);
 
   /* button states */
-  const isLast     = tourIdx === steps.length - 1;
-  const isFirst    = tourIdx === 0 && tourPhase === 'aircraft';
+  const isLast      = tourIdx === steps.length - 1;
+  const isFirst     = tourIdx === 0 && tourPhase === 'aircraft';
   const clickEngine = step.type === 'click-engine';
-  tourNext.textContent = isLast ? 'Get started' : 'Next \u2192';
+  tourNext.textContent = isLast ? 'Finish' : 'Next \u2192';
   tourNext.classList.toggle('hidden', clickEngine);
   tourBack.classList.toggle('hidden', isFirst);
 
@@ -1497,22 +1521,43 @@ function positionTour() {
   tourScrim.style.background = '';
   tourScrim.style.transform  = '';
 
+  /* Activate required tab if highlighting findings or readings */
+  if (step.targetId === 'panel-readings') {
+    setInfoTab('readings');
+  } else if (step.targetId === 'panel-findings') {
+    setInfoTab('findings');
+  }
+
   const target = document.getElementById(step.targetId);
   if (!target) return;
-  /* temporarily reveal hidden targets so getBoundingClientRect works */
-  const wasHidden = target.classList.contains('hidden');
-  if (wasHidden) target.classList.remove('hidden');
-  const r  = target.getBoundingClientRect();
-  if (wasHidden) target.classList.add('hidden');
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  const tipW = 300;
+
+  /* Ensure target is visible before scrolling and measuring */
+  if (step.targetId === 'sec-extra-wrap') {
+    target.classList.remove('hidden');
+    const extraEl = document.getElementById('sec-extra');
+    if (!extraEl.innerHTML || !extraEl.textContent.trim()) {
+      extraEl.innerHTML = '<div class="finding unknown"><div class="t">Remaining useful life & degradation projection</div><div class="d">Shows live P10\u2013P90 confidence band and degradation rate when a fault is detected or simulated.</div></div>';
+    }
+  } else if (step.targetId === 'sec-parts') {
+    target.classList.remove('hidden');
+  } else if (target.classList.contains('hidden')) {
+    target.classList.remove('hidden');
+  }
+
+  /* Scroll target into view with centering so it's fully visible in sidebar */
+  target.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
+
+  const r   = target.getBoundingClientRect();
+  const vw  = window.innerWidth;
+  const vh  = window.innerHeight;
+  const tipW = tourTooltip.offsetWidth || 300;
   const tipH = tourTooltip.offsetHeight || 220;
 
-  const sx = r.left - PAD;
-  const sy = r.top  - PAD;
-  const sw = r.width  + PAD * 2;
-  const sh = r.height + PAD * 2;
+  const sx = Math.max(0, r.left - PAD);
+  const sy = Math.max(0, r.top  - PAD);
+  const sw = Math.min(vw - sx, r.width  + PAD * 2);
+  const sh = Math.min(vh - sy, r.height + PAD * 2);
+
   tourScrim.style.position      = 'fixed';
   tourScrim.style.top           = sy + 'px';
   tourScrim.style.left          = sx + 'px';
@@ -1525,17 +1570,17 @@ function positionTour() {
   const GAP = 16;
   let tx, ty;
   if (step.place === 'left') {
-    tx = Math.max(8, sx - tipW - GAP);
-    ty = Math.min(vh - tipH - 8, Math.max(8, sy));
+    tx = Math.max(12, sx - tipW - GAP);
+    ty = Math.min(vh - tipH - 12, Math.max(12, sy));
   } else if (step.place === 'right') {
-    tx = Math.min(vw - tipW - 8, sx + sw + GAP);
-    ty = Math.min(vh - tipH - 8, Math.max(8, sy));
+    tx = Math.min(vw - tipW - 12, sx + sw + GAP);
+    ty = Math.min(vh - tipH - 12, Math.max(12, sy));
   } else if (step.place === 'below') {
-    tx = Math.min(vw - tipW - 8, Math.max(8, sx));
-    ty = Math.min(vh - tipH - 8, sy + sh + GAP);
+    tx = Math.min(vw - tipW - 12, Math.max(12, sx));
+    ty = Math.min(vh - tipH - 12, sy + sh + GAP);
   } else {
-    tx = Math.min(vw - tipW - 8, Math.max(8, sx));
-    ty = Math.max(8, sy - tipH - GAP);
+    tx = Math.min(vw - tipW - 12, Math.max(12, sx));
+    ty = Math.max(12, sy - tipH - GAP);
   }
   tourTooltip.style.transform = '';
   tourTooltip.style.left = tx + 'px';
@@ -1556,7 +1601,7 @@ function closeTour() {
   hideNacelleOverlay();
   tourScrim.classList.add('hidden');
   tourTooltip.classList.add('hidden');
-  if (tourDontShow.checked) {
+  if (tourDontShow && tourDontShow.checked) {
     try { localStorage.setItem(TOUR_KEY, '1'); } catch (e) { /* private */ }
   }
 }
@@ -1587,10 +1632,11 @@ tourBack.onclick = () => {
   }
   /* at first engine step — go back to aircraft tour at the click-engine step */
   if (tourPhase === 'engine') {
+    backToAircraft();
     tourPhase = 'aircraft';
     /* find the click-engine step index */
     tourIdx = AIRCRAFT_STEPS.findIndex(s => s.type === 'click-engine');
-    if (tourIdx < 0) tourIdx = 0;
+    if (tourIdx < 0) tourIdx = AIRCRAFT_STEPS.length - 1;
     positionTour();
   }
 };
@@ -1604,9 +1650,23 @@ document.addEventListener('keydown', e => {
 });
 window.addEventListener('resize', () => { if (tourActive) positionTour(); });
 
+if (nacelleOverlay) {
+  nacelleOverlay.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openEngine('port');
+  });
+}
+
+/* Clear older tour keys so test users get the new tour on enter */
+['shadowtwin_tour_seen', 'shadowtwin_tour_seen_v2', 'shadowtwin_tour_seen_v3'].forEach(k => {
+  try { localStorage.removeItem(k); } catch (e) { /* private */ }
+});
+
 let tourSeen = false;
 try { tourSeen = localStorage.getItem(TOUR_KEY) === '1'; } catch (e) { /* private */ }
-if (!tourSeen) openTour();
+if (!tourSeen) {
+  setTimeout(openTour, 200);
+}
 
 paint();
 connect();
