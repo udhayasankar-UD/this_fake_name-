@@ -1217,3 +1217,138 @@ button:disabled:hover { background: transparent; }
   color: var(--caution);
   font-weight: 500;
 }
+
+/* ---------- Platform HUD overlay (Option B) ---------- */
+.platform-hud {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.hud-pill {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  background: #EAE8E3;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.hud-pill.tactical {
+  background: var(--caution-bg);
+  color: #7D571C;
+  border-color: rgba(181, 134, 63, 0.35);
+}
+.hud-sep {
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+.hud-info {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.stage-head-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+.platform-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.badge-item {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+.badge-item.alert {
+  color: var(--fault);
+  border-color: rgba(168, 82, 72, 0.35);
+  background: var(--fault-bg);
+  font-weight: 600;
+}
+
+/* ---------- Tactical Architecture Card (Single Engine) ---------- */
+.arch-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 12px 14px;
+  margin-top: 10px;
+}
+.arch-card.hidden {
+  display: none;
+}
+.arch-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 9px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.arch-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.arch-tag {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+}
+.arch-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.arch-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  border-bottom: 1px dashed var(--line-soft);
+  padding-bottom: 4px;
+}
+.arch-row:last-child {
+  border-bottom: none;
+}
+.arch-k {
+  color: var(--ink-soft);
+}
+.arch-v {
+  font-weight: 500;
+  color: var(--ink);
+}
+.arch-v.alert-spof {
+  color: var(--fault);
+  font-weight: 600;
+}
+.arch-note {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+  margin: 9px 0 0 0;
+  padding-top: 7px;
+  border-top: 1px solid var(--line-soft);
+  font-style: italic;
+}
+

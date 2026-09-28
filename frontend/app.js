@@ -869,6 +869,40 @@ function updateMissionBanner() {
   let reason = 'Connecting to ground service\u2026';
 
   if (live && live.engines) {
+    if (appMode === 'single') {
+      const port = live.engines.port;
+      const pst = port ? port.status : 'not_evaluated';
+      if (pst === 'fault') {
+        cls = 'fault';
+        label = 'NO-GO \u00b7 ABORT SORTIE';
+        reason = (port.headline || 'Single engine fault') + ' \u2014 zero redundancy (critical SPOF)';
+      } else if (pst === 'caution' || pst === 'anomaly_unclassified') {
+        cls = 'caution';
+        label = 'CAUTION \u00b7 SPOF ALERT';
+        reason = (port.headline || 'Telemetry anomaly') + ' \u2014 single powerplant (no engine-out margin)';
+      } else if (pst === 'not_evaluated') {
+        cls = 'unknown';
+        label = 'EVALUATING';
+        reason = 'Collecting baseline on primary engine';
+      } else {
+        const pconf = port ? port.confidence : null;
+        if (pconf !== null && pconf >= 0.8) {
+          cls = 'nominal';
+          label = 'GO \u00b7 SINGLE PROPULSION';
+          reason = 'Primary 2.2L aero-diesel nominal across all 9 channels';
+        } else {
+          cls = 'caution';
+          label = 'CAUTION';
+          reason = 'Confidence below threshold';
+        }
+      }
+      for (const c of ['nominal', 'caution', 'fault', 'unknown'])
+        el.classList.toggle(c, c === cls);
+      statusEl.textContent = label;
+      reasonEl.textContent = reason;
+      return;
+    }
+
     const port = live.engines.port;
     const star = live.engines.starboard;
     const pst = port ? port.status : 'not_evaluated';
@@ -1369,6 +1403,8 @@ async function openEngine(side) {
   document.getElementById('stage-sub').textContent = 'Flagged components are tinted';
   document.getElementById('side-title').textContent = SIDE_NAME[side] + ' engine';
   document.getElementById('side-sub').textContent = 'Live readings and components';
+  const hudInfo = document.getElementById('hud-platform-info');
+  if (hudInfo && appMode !== 'single') hudInfo.textContent = 'ADE TAPAS-BH-201 \u00b7 ' + SIDE_NAME[side] + ' Nacelle Unit';
   document.getElementById('btn-back').classList.remove('hidden');
   // reveal the Readings tab and switch to it
   document.getElementById('stab-readings').classList.remove('hidden');
@@ -1396,6 +1432,8 @@ function backToAircraft() {
   document.getElementById('stage-sub').textContent = 'Select an engine to inspect';
   document.getElementById('side-title').textContent = 'Propulsion status';
   document.getElementById('side-sub').textContent = 'Twin engine, live telemetry';
+  const hudInfo = document.getElementById('hud-platform-info');
+  if (hudInfo && appMode !== 'single') hudInfo.textContent = 'ADE TAPAS-BH-201 \u00b7 Wing-Mounted Twin Turbodiesels';
   document.getElementById('btn-back').classList.add('hidden');
   // hide the Readings tab and revert to Findings
   document.getElementById('stab-readings').classList.add('hidden');
@@ -1494,6 +1532,29 @@ function showTwinView() {
   if (viewTwin) viewTwin.classList.remove('hidden');
   if (viewFleet) viewFleet.classList.add('hidden');
 
+  // Platform HUD for Twin Engine
+  const topPlatform = document.getElementById('top-nav-platform');
+  if (topPlatform) topPlatform.textContent = 'TAPAS-BH-201 MALE UAV (Twin-Engine)';
+  const hudTag = document.getElementById('hud-platform-tag');
+  if (hudTag) {
+    hudTag.textContent = 'TWIN-PROPULSION MALE UAV';
+    hudTag.className = 'hud-pill';
+  }
+  const hudInfo = document.getElementById('hud-platform-info');
+  if (hudInfo) hudInfo.textContent = 'ADE TAPAS-BH-201 \u00b7 Wing-Mounted Twin Turbodiesels';
+  const badgeBus = document.getElementById('badge-bus');
+  if (badgeBus) {
+    badgeBus.textContent = 'CAN: Dual-Node J1939';
+    badgeBus.className = 'badge-item';
+  }
+  const badgeRedun = document.getElementById('badge-redun');
+  if (badgeRedun) {
+    badgeRedun.textContent = 'Asymmetric Engine-Out Active';
+    badgeRedun.className = 'badge-item';
+  }
+  const archCard = document.getElementById('entry-architecture');
+  if (archCard) archCard.classList.add('hidden');
+
   // Restore Starboard entry and restore Port label
   const entryStbd = document.getElementById('entry-starboard');
   if (entryStbd) entryStbd.classList.remove('hidden');
@@ -1515,6 +1576,8 @@ function showTwinView() {
   if (bSys) bSys.textContent = 'Both engines drift';
 
   backToAircraft();
+  updateMissionBanner();
+  updateMissionMargin();
   needsRender = true;
   if (typeof resize === 'function') resize();
 }
@@ -1536,6 +1599,29 @@ async function showSingleView() {
   if (viewTwin) viewTwin.classList.remove('hidden');
   if (viewFleet) viewFleet.classList.add('hidden');
 
+  // Platform HUD for Single Engine
+  const topPlatform = document.getElementById('top-nav-platform');
+  if (topPlatform) topPlatform.textContent = 'RUSTOM-I Tactical UAV (Single-Engine)';
+  const hudTag = document.getElementById('hud-platform-tag');
+  if (hudTag) {
+    hudTag.textContent = 'TACTICAL SINGLE-PROPULSION UAV';
+    hudTag.className = 'hud-pill tactical';
+  }
+  const hudInfo = document.getElementById('hud-platform-info');
+  if (hudInfo) hudInfo.textContent = 'ADE Rustom-I / Archer Class \u00b7 Fuselage Centerline 2.2L Turbodiesel';
+  const badgeBus = document.getElementById('badge-bus');
+  if (badgeBus) {
+    badgeBus.textContent = 'CAN: Simplex J1939 (ECU-1)';
+    badgeBus.className = 'badge-item';
+  }
+  const badgeRedun = document.getElementById('badge-redun');
+  if (badgeRedun) {
+    badgeRedun.textContent = 'SPOF: Zero Engine-Out Recovery';
+    badgeRedun.className = 'badge-item alert';
+  }
+  const archCard = document.getElementById('entry-architecture');
+  if (archCard) archCard.classList.remove('hidden');
+
   // Hide starboard engine and update port label to Primary Engine
   const entryStbd = document.getElementById('entry-starboard');
   if (entryStbd) entryStbd.classList.add('hidden');
@@ -1546,7 +1632,7 @@ async function showSingleView() {
   const lPair = document.getElementById('margin-pair-label');
   if (lPair) lPair.textContent = 'Sortie margin';
   const lOut = document.getElementById('margin-out-label');
-  if (lOut) lOut.textContent = 'Engine-out (N/A)';
+  if (lOut) lOut.textContent = 'Engine-out (N/A \u2014 SPOF)';
 
   // Update simulate buttons for single engine
   const bInj = document.getElementById('sim-btn-injector');
@@ -1580,6 +1666,8 @@ async function showSingleView() {
   setInfoTab('readings');
   document.getElementById('sec-parts').classList.remove('hidden');
 
+  updateMissionBanner();
+  updateMissionMargin();
   needsRender = true;
   if (typeof resize === 'function') resize();
   paintDetail();
@@ -1602,6 +1690,10 @@ function showFleetView() {
   }
   if (viewFleet) viewFleet.classList.remove('hidden');
   if (viewTwin) viewTwin.classList.add('hidden');
+
+  const topPlatform = document.getElementById('top-nav-platform');
+  if (topPlatform) topPlatform.textContent = 'Squadron Propulsion Command (4 UAVs)';
+
   needsRender = false;
   updateFleetCard1();
 }

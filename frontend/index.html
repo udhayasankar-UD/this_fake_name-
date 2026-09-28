@@ -12,7 +12,7 @@
     <span class="top-nav-badge">DRDO SIH 26054</span>
     <strong class="top-nav-title">AeroTwin</strong>
     <span class="top-nav-sep">/</span>
-    <span class="top-nav-platform">TAPAS-BH-201 MALE UAV</span>
+    <span class="top-nav-platform" id="top-nav-platform">TAPAS-BH-201 MALE UAV (Twin-Engine)</span>
   </div>
   <div class="top-nav-switcher" role="tablist">
     <button class="top-nav-tab active" id="btn-view-twin" role="tab" aria-selected="true">
@@ -41,10 +41,21 @@
 
     <div class="stage-head">
       <div>
+        <div class="platform-hud" id="platform-hud">
+          <span class="hud-pill" id="hud-platform-tag">TWIN-PROPULSION MALE UAV</span>
+          <span class="hud-sep">·</span>
+          <span class="hud-info" id="hud-platform-info">ADE TAPAS-BH-201 · Wing-Mounted Twin Turbodiesels</span>
+        </div>
         <p class="stage-title" id="stage-title">Aircraft</p>
         <p class="stage-sub" id="stage-sub">Select an engine to inspect</p>
       </div>
-      <p class="stage-sub" id="tier-note"></p>
+      <div class="stage-head-right">
+        <div class="platform-badges" id="platform-badges">
+          <span class="badge-item" id="badge-bus">CAN: Dual-Node J1939</span>
+          <span class="badge-item" id="badge-redun">Asymmetric Engine-Out Active</span>
+        </div>
+        <p class="stage-sub" id="tier-note"></p>
+      </div>
     </div>
 
     <!-- floating tabbed info bar: Findings | Readings -->
@@ -116,6 +127,31 @@
           <div class="sparkline-row" id="spark-starboard"></div>
         </button>
         <div class="engine-rul" id="rul-starboard"></div>
+      </div>
+      <div class="arch-card hidden" id="entry-architecture">
+        <div class="arch-head">
+          <span class="arch-title">Tactical Propulsion Topology</span>
+          <span class="arch-tag">Simplex Node</span>
+        </div>
+        <div class="arch-body">
+          <div class="arch-row">
+            <span class="arch-k">Airframe Class</span>
+            <span class="arch-v">Rustom-I Tactical Short-Range UAV</span>
+          </div>
+          <div class="arch-row">
+            <span class="arch-k">Installation</span>
+            <span class="arch-v">Fuselage Centerline Pusher Propeller</span>
+          </div>
+          <div class="arch-row">
+            <span class="arch-k">CAN Bus Link</span>
+            <span class="arch-v">Simplex J1939 (ECU-1 Node @ 0x18FF0101)</span>
+          </div>
+          <div class="arch-row">
+            <span class="arch-k">Safety Protocol</span>
+            <span class="arch-v alert-spof">Critical SPOF — Zero Engine-Out Margin</span>
+          </div>
+        </div>
+        <p class="arch-note">Single-engine UAV architecture has no asymmetric limp-home capability. Telemetry anomaly mandates immediate forced glide or recovery abort.</p>
       </div>
     </div>
 
