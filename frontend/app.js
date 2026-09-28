@@ -1215,57 +1215,212 @@ document.getElementById('parts').addEventListener('click', e => {
 });
 
 
-/* ---------- first-run guide ---------- */
+/* ---------- spotlight guide ---------- */
 
 const TOUR_KEY = 'shadowtwin_tour_seen_v1';
-const tourSlides = Array.from(document.querySelectorAll('.tour-slide'));
-const tourOverlay = document.getElementById('tour-overlay');
-const tourDots = document.getElementById('tour-dots');
-const tourNext = document.getElementById('tour-next');
-const tourSkip = document.getElementById('tour-skip');
-const tourClose = document.getElementById('tour-close');
-const tourDontShow = document.getElementById('tour-dontshow-final');
-let tourIdx = 0;
 
-tourSlides.forEach((_, i) => {
+/* Each step: targetId = element to highlight (null = no spotlight, centered tooltip)
+   place = tooltip placement relative to target: 'left'|'right'|'below'|'above'|'center'
+   showDontShow: only last step gets the checkbox */
+const TOUR_STEPS = [
+  {
+    targetId: null,
+    place: 'center',
+    eyebrow: 'Shadow Twin — quick guide',
+    title: 'A digital twin for a twin-engine UAV',
+    body: 'This dashboard runs a live physics model of both engines side by side with ' +
+          'real telemetry, and flags the moment either one drifts from what the model expects. ' +
+          'Five short steps show you around.',
+    showDontShow: false
+  },
+  {
+    targetId: 'viewport',
+    place: 'right',
+    eyebrow: 'Step 1 of 5 — 3D View',
+    title: 'The aircraft model',
+    body: '<strong>Drag</strong> to rotate, <strong>scroll</strong> to zoom. ' +
+          'Click either engine nacelle on the wing to fly in and inspect that engine up close.',
+    showDontShow: false
+  },
+  {
+    targetId: 'sec-engines',
+    place: 'left',
+    eyebrow: 'Step 2 of 5 — Engine Cards',
+    title: 'Port & Starboard engines',
+    body: 'Each card shows live status (<strong>Nominal / Watch / Fault</strong>), ' +
+          'a health sparkline trend, and remaining-useful-life once the baseline fills. ' +
+          'Click a card to open the engine detail view.',
+    showDontShow: false
+  },
+  {
+    targetId: 'mission-banner',
+    place: 'left',
+    eyebrow: 'Step 3 of 5 — Mission Status',
+    title: 'Go / No-Go banner',
+    body: 'Combines both engines into a single <strong>GO / CAUTION / NO-GO</strong> call ' +
+          'for the current sortie. Pair margin and engine-out margin are shown below.',
+    showDontShow: false
+  },
+  {
+    targetId: 'stage-infobar',
+    place: 'right',
+    eyebrow: 'Step 4 of 5 — Findings panel',
+    title: 'Findings & Readings',
+    body: '<strong>Findings</strong> explains what\'s wrong in plain language. ' +
+          '<strong>Readings</strong> shows every sensor channel next to what the physics model ' +
+          'expected — so you can see exactly why a finding was raised.',
+    showDontShow: false
+  },
+  {
+    targetId: 'sec-simulate',
+    place: 'left',
+    eyebrow: 'Step 5 of 5 — Simulate',
+    title: 'Inject a fault to try it out',
+    body: 'Pick <strong>Injector fault</strong>, <strong>Sensor fault</strong>, or ' +
+          '<strong>Both engines drift</strong> and watch detection update within seconds. ' +
+          '<strong>Clear</strong> resets to nominal.',
+    showDontShow: true
+  }
+];
+
+const tourScrim    = document.getElementById('tour-overlay');   // repurposed as scrim
+const tourTooltip  = document.getElementById('tour-tooltip');
+const tourDots     = document.getElementById('tour-dots');
+const tourNext     = document.getElementById('tour-next');
+const tourSkip     = document.getElementById('tour-skip');
+const tourDontShow = document.getElementById('tour-dontshow-final');
+const tourDontWrap = document.getElementById('tour-dontshow-wrap');
+let tourIdx = 0;
+let tourActive = false;
+
+/* Build progress dots */
+TOUR_STEPS.forEach((_, i) => {
   const d = document.createElement('span');
   d.className = 'dot';
   tourDots.appendChild(d);
 });
 
-function renderTour() {
-  tourSlides.forEach((s, i) => s.classList.toggle('active', i === tourIdx));
+const PAD = 8;   // spotlight padding around target element in px
+
+function positionTour() {
+  const step = TOUR_STEPS[tourIdx];
+
+  /* update text */
+  document.getElementById('tour-eyebrow').textContent   = step.eyebrow;
+  document.getElementById('tour-tip-title').textContent = step.title;
+  document.getElementById('tour-tip-body').innerHTML    = step.body;
+  tourDontWrap.classList.toggle('hidden', !step.showDontShow);
+  tourNext.textContent = tourIdx === TOUR_STEPS.length - 1 ? 'Get started' : 'Next →';
   Array.from(tourDots.children).forEach((d, i) => d.classList.toggle('active', i === tourIdx));
-  tourNext.textContent = tourIdx === tourSlides.length - 1 ? 'Get started' : 'Next';
+
+  /* placement arrow class */
+  tourTooltip.className = 'tour-tooltip place-' + step.place;
+
+  if (!step.targetId) {
+    /* no spotlight: scrim is a full-cover dim, tooltip is centered */
+    tourScrim.style.position = 'fixed';
+    tourScrim.style.top      = '0';
+    tourScrim.style.left     = '0';
+    tourScrim.style.width    = '100vw';
+    tourScrim.style.height   = '100vh';
+    tourScrim.style.borderRadius = '0';
+    tourScrim.style.boxShadow = 'none';
+    tourScrim.style.background = 'rgba(42,46,51,0.50)';
+    tourScrim.style.pointerEvents = 'auto';
+
+    tourTooltip.style.top  = '50%';
+    tourTooltip.style.left = '50%';
+    tourTooltip.style.transform = 'translate(-50%,-50%)';
+    return;
+  }
+
+  tourScrim.style.background = '';
+  tourScrim.style.transform  = '';
+
+  const target = document.getElementById(step.targetId);
+  if (!target) return;
+  const r = target.getBoundingClientRect();
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const tipW = 300;
+  const tipH = tourTooltip.offsetHeight || 220;
+
+  /* position scrim hole */
+  const sx = r.left - PAD;
+  const sy = r.top  - PAD;
+  const sw = r.width  + PAD * 2;
+  const sh = r.height + PAD * 2;
+  tourScrim.style.position     = 'fixed';
+  tourScrim.style.top          = sy + 'px';
+  tourScrim.style.left         = sx + 'px';
+  tourScrim.style.width        = sw + 'px';
+  tourScrim.style.height       = sh + 'px';
+  tourScrim.style.borderRadius = '6px';
+  tourScrim.style.boxShadow    = '0 0 0 9999px rgba(42,46,51,0.55)';
+  tourScrim.style.pointerEvents = 'none';
+
+  /* position tooltip */
+  const GAP = 16;
+  let tx, ty;
+  if (step.place === 'left') {
+    tx = Math.max(8, sx - tipW - GAP);
+    ty = Math.min(vh - tipH - 8, Math.max(8, sy));
+  } else if (step.place === 'right') {
+    tx = Math.min(vw - tipW - 8, sx + sw + GAP);
+    ty = Math.min(vh - tipH - 8, Math.max(8, sy));
+  } else if (step.place === 'below') {
+    tx = Math.min(vw - tipW - 8, Math.max(8, sx));
+    ty = Math.min(vh - tipH - 8, sy + sh + GAP);
+  } else { /* above */
+    tx = Math.min(vw - tipW - 8, Math.max(8, sx));
+    ty = Math.max(8, sy - tipH - GAP);
+  }
+  tourTooltip.style.transform = '';
+  tourTooltip.style.left = tx + 'px';
+  tourTooltip.style.top  = ty + 'px';
 }
 
 function openTour() {
   tourIdx = 0;
-  renderTour();
-  tourOverlay.classList.remove('hidden');
+  tourActive = true;
+  tourScrim.classList.remove('hidden');
+  tourTooltip.classList.remove('hidden');
+  positionTour();
 }
 
 function closeTour() {
-  tourOverlay.classList.add('hidden');
+  tourActive = false;
+  tourScrim.classList.add('hidden');
+  tourTooltip.classList.add('hidden');
   if (tourDontShow.checked) {
-    try { localStorage.setItem(TOUR_KEY, '1'); } catch (e) { /* private window etc. */ }
+    try { localStorage.setItem(TOUR_KEY, '1'); } catch (e) { /* private window */ }
   }
 }
 
 tourNext.onclick = () => {
-  if (tourIdx < tourSlides.length - 1) { tourIdx += 1; renderTour(); }
+  if (tourIdx < TOUR_STEPS.length - 1) { tourIdx += 1; positionTour(); }
   else closeTour();
 };
 tourSkip.onclick = closeTour;
-tourClose.onclick = closeTour;
 document.getElementById('btn-help').onclick = openTour;
-tourOverlay.addEventListener('click', e => { if (e.target === tourOverlay) closeTour(); });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && !tourOverlay.classList.contains('hidden')) closeTour();
+  if (e.key === 'Escape' && tourActive) closeTour();
 });
+/* reposition if window resizes (e.g. panel opens) */
+window.addEventListener('resize', () => { if (tourActive) positionTour(); });
+
+/* step 4 highlight (stage-infobar) only appears when an engine is open;
+   if the user is still in aircraft view, fall back to targeting the canvas */
+function tourTargetForStep(idx) {
+  const step = TOUR_STEPS[idx];
+  if (step.targetId === 'stage-infobar' && view !== 'engine') {
+    return 'viewport';
+  }
+  return step.targetId;
+}
 
 let tourSeen = false;
-try { tourSeen = localStorage.getItem(TOUR_KEY) === '1'; } catch (e) { /* private window etc. */ }
+try { tourSeen = localStorage.getItem(TOUR_KEY) === '1'; } catch (e) { /* private window */ }
 if (!tourSeen) openTour();
 
 paint();

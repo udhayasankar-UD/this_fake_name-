@@ -339,45 +339,72 @@ button:disabled:hover { background: transparent; }
 }
 .help-btn:hover { color: var(--ink); border-color: var(--ink-soft); }
 
-/* ---- first-run guide overlay ---- */
-.tour-overlay {
+/* ---- spotlight tour ---- */
+/* Scrim: covers the whole viewport but lets JS punch a transparent hole via
+   box-shadow so the target element shows through. No clip-path — box-shadow
+   spread trick works without any inline style; JS sets the shadow offset+size
+   via CSSOM (element.style.boxShadow). */
+.tour-scrim {
   position: fixed;
   inset: 0;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(42, 46, 51, 0.45);
-  padding: 20px;
+  z-index: 200;
+  pointer-events: none; /* tooltip receives clicks instead */
 }
-.tour-overlay.hidden { display: none; }
+.tour-scrim.active {
+  pointer-events: auto;
+  box-shadow: 0 0 0 9999px rgba(42, 46, 51, 0.55);
+  border-radius: 6px;
+  transition: top 260ms var(--ease), left 260ms var(--ease),
+              width 260ms var(--ease), height 260ms var(--ease),
+              box-shadow 200ms var(--ease);
+}
+.tour-scrim.hidden { display: none; }
 
-.tour-card {
-  position: relative;
-  width: min(480px, 100%);
+/* Tooltip card that appears beside the highlighted element */
+.tour-tooltip {
+  position: fixed;
+  z-index: 201;
+  width: 300px;
   background: var(--panel);
   border-radius: var(--radius);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
-  padding: 28px 28px 20px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.20), 0 0 0 1px var(--line);
+  padding: 20px 20px 16px;
+  transition: top 260ms var(--ease), left 260ms var(--ease), opacity 180ms;
 }
+.tour-tooltip.hidden { display: none; }
 
-.tour-close {
+/* Arrow pointing from tooltip toward the highlighted element */
+.tour-tooltip::before {
+  content: '';
   position: absolute;
-  top: 10px;
-  right: 12px;
-  border: none;
-  background: none;
-  font-size: 20px;
-  line-height: 1;
-  color: var(--ink-faint);
-  cursor: pointer;
-  padding: 4px;
+  width: 10px;
+  height: 10px;
+  background: var(--panel);
+  box-shadow: -1px -1px 0 var(--line);
+  border-radius: 1px;
 }
-.tour-close:hover { color: var(--ink); }
-
-.tour-slides { position: relative; min-height: 170px; }
-.tour-slide { display: none; }
-.tour-slide.active { display: block; }
+/* Placement classes set arrow position; JS adds the right one */
+.tour-tooltip.place-left::before {
+  right: -6px;
+  top: 20px;
+  transform: rotate(135deg);
+}
+.tour-tooltip.place-right::before {
+  left: -6px;
+  top: 20px;
+  transform: rotate(-45deg);
+}
+.tour-tooltip.place-below::before {
+  top: -6px;
+  left: 20px;
+  transform: rotate(45deg);
+}
+.tour-tooltip.place-above::before {
+  bottom: -6px;
+  left: 20px;
+  transform: rotate(-135deg);
+}
+.tour-tooltip.place-center::before { display: none; }
 
 .tour-eyebrow {
   font-size: 11px;
@@ -385,56 +412,60 @@ button:disabled:hover { background: transparent; }
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--ink-faint);
-  margin: 0 0 6px;
+  margin: 0 0 4px;
 }
-.tour-slide h2 {
-  font-size: 18px;
-  margin: 0 0 10px;
+.tour-tip-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 8px;
   color: var(--ink);
+  line-height: 1.3;
 }
-.tour-slide p {
-  font-size: 13.5px;
+.tour-tip-body {
+  font-size: 13px;
   line-height: 1.55;
   color: var(--ink-soft);
   margin: 0;
 }
-.tour-slide strong { color: var(--ink); font-weight: 600; }
+.tour-tip-body strong { color: var(--ink); font-weight: 600; }
 
 .tour-dontshow {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 16px;
+  margin-top: 12px;
   font-size: 12px;
   color: var(--ink-soft);
   cursor: pointer;
 }
+.tour-dontshow.hidden { display: none; }
 
 .tour-foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 20px;
-  padding-top: 16px;
+  margin-top: 14px;
+  padding-top: 12px;
   border-top: 1px solid var(--line-soft);
 }
-.tour-dots { display: flex; gap: 6px; }
+.tour-dots { display: flex; gap: 5px; }
 .tour-dots .dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: var(--line);
+  transition: background 160ms;
 }
 .tour-dots .dot.active { background: var(--ink-soft); }
 
-.tour-nav { display: flex; gap: 10px; }
+.tour-nav { display: flex; gap: 8px; }
 .tour-btn {
   border: 1px solid var(--ink);
   background: var(--ink);
   color: var(--panel);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
-  padding: 7px 16px;
+  padding: 6px 14px;
   border-radius: var(--radius-sm);
   cursor: pointer;
 }
