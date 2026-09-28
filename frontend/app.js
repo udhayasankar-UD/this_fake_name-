@@ -1298,81 +1298,154 @@ document.getElementById('parts').addEventListener('click', e => {
 
 /* ---------- spotlight guide ---------- */
 
-const TOUR_KEY = 'shadowtwin_tour_seen_v4';
+/* ---------- view switcher: twin vs fleet ---------- */
+
+const btnViewTwin   = document.getElementById('btn-view-twin');
+const btnViewFleet  = document.getElementById('btn-view-fleet');
+const viewTwin      = document.getElementById('view-twin');
+const viewFleet     = document.getElementById('view-fleet');
+
+function showTwinView() {
+  if (btnViewTwin) {
+    btnViewTwin.classList.add('active');
+    btnViewTwin.setAttribute('aria-selected', 'true');
+  }
+  if (btnViewFleet) {
+    btnViewFleet.classList.remove('active');
+    btnViewFleet.setAttribute('aria-selected', 'false');
+  }
+  if (viewTwin) viewTwin.classList.remove('hidden');
+  if (viewFleet) viewFleet.classList.add('hidden');
+  needsRender = true;
+  if (typeof resize === 'function') resize();
+}
+
+function showFleetView() {
+  if (btnViewFleet) {
+    btnViewFleet.classList.add('active');
+    btnViewFleet.setAttribute('aria-selected', 'true');
+  }
+  if (btnViewTwin) {
+    btnViewTwin.classList.remove('active');
+    btnViewTwin.setAttribute('aria-selected', 'false');
+  }
+  if (viewFleet) viewFleet.classList.remove('hidden');
+  if (viewTwin) viewTwin.classList.add('hidden');
+  needsRender = false;
+  updateFleetCard1();
+}
+
+if (btnViewTwin)   btnViewTwin.onclick = showTwinView;
+if (btnViewFleet)  btnViewFleet.onclick = showFleetView;
+const btnFleetOpenTwin = document.getElementById('btn-fleet-open-twin');
+if (btnFleetOpenTwin) btnFleetOpenTwin.onclick = showTwinView;
+const btnFleetTableTwin = document.getElementById('btn-fleet-table-twin');
+if (btnFleetTableTwin) btnFleetTableTwin.onclick = showTwinView;
+
+/* ---------- spotlight guide ---------- */
+
+const TOUR_KEY = 'shadowtwin_tour_seen_v5';
 
 /* ---- Aircraft-view steps ---- */
 const AIRCRAFT_STEPS = [
   {
     targetId: null,
     place: 'center',
-    eyebrow: 'Shadow Twin \u2014 quick guide',
-    title: 'A digital twin for a twin-engine UAV',
-    body: 'This dashboard runs a live physics model of both engines side by side with ' +
-          'real telemetry, and flags the moment either one drifts from what the model expects. ' +
+    eyebrow: 'AeroTwin \u2014 Quick Guide',
+    title: 'Digital Twin for Twin-Engine MALE UAVs',
+    body: 'This system runs a real-time physics model side-by-side with incoming CAN telemetry, ' +
+          'detecting propulsion anomalies and predicting remaining useful life before faults become critical. ' +
           'Let\u2019s walk through the key features.',
     showDontShow: false,
-    type: 'normal'
+    type: 'normal',
+    view: 'twin'
   },
   {
     targetId: 'viewport',
     place: 'right',
-    eyebrow: 'Aircraft Step 1 of 6 \u2014 3D View',
-    title: 'The UAV airframe',
-    body: '<strong>Drag</strong> to rotate, <strong>scroll</strong> to zoom. ' +
-          'The twin nacelles on each wing house the 2.2\u202fL aero-diesel powerplants.',
+    eyebrow: 'Aircraft Step 1 of 8 \u2014 3D Airframe',
+    title: 'TAPAS-BH-201 3D Airframe',
+    body: '<strong>Drag</strong> to orbit, <strong>scroll</strong> to zoom. ' +
+          'The twin wing-mounted nacelles house the 2.2\u202fL turbo-diesel aero powerplants.',
     showDontShow: false,
-    type: 'normal'
+    type: 'normal',
+    view: 'twin'
   },
   {
     targetId: 'mission-banner',
     place: 'left',
-    eyebrow: 'Aircraft Step 2 of 6 \u2014 Go / No-Go Banner',
-    title: 'Mission status at a glance',
+    eyebrow: 'Aircraft Step 2 of 8 \u2014 Go / No-Go Banner',
+    title: 'Mission readiness at a glance',
     body: 'Combines health across both engines into a single operational call: ' +
           '<strong>GO</strong>, <strong>CAUTION</strong>, or <strong>NO-GO</strong>. ' +
           'If it says GO, the aircraft is safe to fly. CAUTION warns of emerging drift, and NO-GO marks critical degradation.',
     showDontShow: false,
-    type: 'normal'
+    type: 'normal',
+    view: 'twin'
   },
   {
     targetId: 'sec-engines',
     place: 'left',
-    eyebrow: 'Aircraft Step 3 of 6 \u2014 Engine Status',
+    eyebrow: 'Aircraft Step 3 of 8 \u2014 Engine Status',
     title: 'Port & Starboard engines',
     body: 'Each card shows live status (<strong>Nominal / Caution / Fault</strong>), ' +
           'health sparkline trend, and remaining useful life. You can monitor whether one or both engines are degrading.',
     showDontShow: false,
-    type: 'normal'
+    type: 'normal',
+    view: 'twin'
   },
   {
     targetId: 'sec-margin',
     place: 'left',
-    eyebrow: 'Aircraft Step 4 of 6 \u2014 Mission Margin',
+    eyebrow: 'Aircraft Step 4 of 8 \u2014 Mission Margin',
     title: 'Sortie endurance margins',
     body: '<strong>Hours pair margin</strong> shows how many flight hours both engines together can sustain before hitting limits. ' +
           '<strong>Engine-out margin</strong> shows endurance if one engine failed.',
     showDontShow: false,
-    type: 'normal'
+    type: 'normal',
+    view: 'twin'
   },
   {
     targetId: 'sec-simulate',
     place: 'left',
-    eyebrow: 'Aircraft Step 5 of 6 \u2014 Simulate',
+    eyebrow: 'Aircraft Step 5 of 8 \u2014 Simulate',
     title: 'Live fault injection',
     body: 'Test how the twin responds. Inject an <strong>Injector fault</strong>, <strong>Sensor fault</strong>, or ' +
           '<strong>Both engines drift</strong> to see live detection and mission margins update. <strong>Clear</strong> resets to nominal.',
     showDontShow: false,
-    type: 'normal'
+    type: 'normal',
+    view: 'twin'
+  },
+  {
+    targetId: 'btn-view-fleet',
+    place: 'below',
+    eyebrow: 'Aircraft Step 6 of 8 \u2014 Fleet Navigation',
+    title: 'Multi-UAV fleet switching',
+    body: 'Use this top switcher to toggle between the <strong>TAPAS-01 Live Twin</strong> and the <strong>Squadron Fleet Command</strong> dashboard to oversee all 4 UAVs simultaneously.',
+    showDontShow: false,
+    type: 'normal',
+    view: 'twin'
+  },
+  {
+    targetId: 'fleet-card-1',
+    place: 'right',
+    eyebrow: 'Aircraft Step 7 of 8 \u2014 Squadron Fleet Command',
+    title: 'Monitor 4 UAVs in a single dashboard',
+    body: 'The twin scales across the entire squadron. Here you can monitor all 4 MALE UAVs simultaneously \u2014 tracking propulsion health, operational readiness (GO / CAUTION / NO-GO), and sortie margins in real time. TAPAS-03 is flagged for Starboard EGT drift.',
+    showDontShow: false,
+    type: 'normal',
+    view: 'fleet'
   },
   {
     targetId: 'viewport',
     place: 'right',
-    eyebrow: 'Aircraft Step 6 of 6 \u2014 Engine Inspection',
+    eyebrow: 'Aircraft Step 8 of 8 \u2014 Engine Inspection',
     title: 'Click an engine nacelle to fly inside',
-    body: 'The pulsing rings mark the engine nacelles. <strong>Click either engine nacelle</strong> ' +
+    body: 'Back on lead aircraft TAPAS-01: the pulsing rings mark the engine nacelles. <strong>Click either engine nacelle</strong> ' +
           '(or click an engine card on the right) to fly inside and inspect the engine internals!',
     showDontShow: false,
-    type: 'click-engine'   // Next hidden; advances automatically when openEngine() fires
+    type: 'click-engine',
+    view: 'twin'
   }
 ];
 
@@ -1484,6 +1557,63 @@ const ENGINE_STEPS = [
   }
 ];
 
+/* ---- Fleet-view steps (shown when tour is opened in Fleet view) ---- */
+const FLEET_STEPS = [
+  {
+    targetId: null,
+    place: 'center',
+    eyebrow: 'Fleet Command \u2014 Quick Guide',
+    title: 'Squadron Propulsion Fleet Command',
+    body: 'This dashboard provides fleet-level health monitoring and predictive maintenance ' +
+          'across multiple MALE UAVs, directly fulfilling the DRDO SIH 26054 multi-aircraft requirement.',
+    showDontShow: false,
+    type: 'normal',
+    view: 'fleet'
+  },
+  {
+    targetId: 'fleet-card-1',
+    place: 'right',
+    eyebrow: 'Fleet Step 1 of 4 \u2014 Live Digital Twin',
+    title: 'TAPAS-01 (Bravo-01) Live Link',
+    body: 'This airframe is currently connected to the live CAN bus telemetry feed. ' +
+          'Click <strong>Inspect Live Digital Twin \u2192</strong> (or the top tab) to open the full 3D interactive model and physics analytics.',
+    showDontShow: false,
+    type: 'normal',
+    view: 'fleet'
+  },
+  {
+    targetId: 'fleet-card-3',
+    place: 'left',
+    eyebrow: 'Fleet Step 2 of 4 \u2014 Fleet Caution Alert',
+    title: 'Automated fleet-wide anomaly tracking',
+    body: 'When any aircraft in the squadron begins to degrade, it is immediately flagged with root-cause advisories ' +
+          '(such as TAPAS-03\u2019s Starboard EGT drift and injector variance) before flight safety is compromised.',
+    showDontShow: false,
+    type: 'normal',
+    view: 'fleet'
+  },
+  {
+    targetId: 'fleet-card-4',
+    place: 'left',
+    eyebrow: 'Fleet Step 3 of 4 \u2014 Depot Maintenance',
+    title: 'Scheduled service tracking',
+    body: 'Tracks airframes in hangared depot maintenance at ATR Chitradurga, including run hours and periodic inspection clearance.',
+    showDontShow: false,
+    type: 'normal',
+    view: 'fleet'
+  },
+  {
+    targetId: 'btn-view-twin',
+    place: 'below',
+    eyebrow: 'Fleet Step 4 of 4 \u2014 Deep Engine Inspection',
+    title: 'Return to 3D Digital Twin',
+    body: 'Click <strong>TAPAS-01 Live Twin</strong> at any time to return to the interactive 3D airframe, physics residual charts, and component-level diagnostics.',
+    showDontShow: true,
+    type: 'normal',
+    view: 'fleet'
+  }
+];
+
 /* ---- State ---- */
 const tourScrim      = document.getElementById('tour-overlay');
 const tourTooltip    = document.getElementById('tour-tooltip');
@@ -1496,11 +1626,12 @@ const tourDontWrap   = document.getElementById('tour-dontshow-wrap');
 const nacelleOverlay = document.getElementById('tour-nacelle-pulse');
 
 let tourActive    = false;
-let tourPhase     = 'aircraft';   // 'aircraft' | 'engine'
+let tourPhase     = 'aircraft';   // 'aircraft' | 'engine' | 'fleet'
 let tourIdx       = 0;
 let nacelleRafId  = null;
 
 function currentSteps() {
+  if (tourPhase === 'fleet') return FLEET_STEPS;
   return tourPhase === 'engine' ? ENGINE_STEPS : AIRCRAFT_STEPS;
 }
 
@@ -1556,6 +1687,13 @@ function positionTour() {
   const step  = steps[tourIdx];
   if (!step) return;
 
+  /* Switch view if step specifies one */
+  if (step.view === 'fleet' && typeof showFleetView === 'function') {
+    showFleetView();
+  } else if (step.view === 'twin' && typeof showTwinView === 'function') {
+    showTwinView();
+  }
+
   /* text */
   document.getElementById('tour-eyebrow').textContent   = step.eyebrow;
   document.getElementById('tour-tip-title').textContent = step.title;
@@ -1564,7 +1702,7 @@ function positionTour() {
 
   /* button states */
   const isLast      = tourIdx === steps.length - 1;
-  const isFirst     = tourIdx === 0 && tourPhase === 'aircraft';
+  const isFirst     = tourIdx === 0 && (tourPhase === 'aircraft' || tourPhase === 'fleet');
   const clickEngine = step.type === 'click-engine';
   tourNext.textContent = isLast ? 'Finish' : 'Next \u2192';
   tourNext.classList.toggle('hidden', clickEngine);
@@ -1623,8 +1761,10 @@ function positionTour() {
     target.classList.remove('hidden');
   }
 
-  /* Scroll target into view with centering so it's fully visible in sidebar */
-  target.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
+  /* Scroll target into view with centering so it's fully visible in sidebar or container */
+  if (step.targetId !== 'btn-view-fleet' && step.targetId !== 'btn-view-twin') {
+    target.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
+  }
 
   const r   = target.getBoundingClientRect();
   const vw  = window.innerWidth;
@@ -1667,9 +1807,13 @@ function positionTour() {
 }
 
 function openTour() {
-  if (typeof showTwinView === 'function') showTwinView();
+  if (viewFleet && !viewFleet.classList.contains('hidden')) {
+    tourPhase = 'fleet';
+  } else {
+    showTwinView();
+    tourPhase = 'aircraft';
+  }
   tourIdx   = 0;
-  tourPhase = 'aircraft';
   tourActive = true;
   tourScrim.classList.remove('hidden');
   tourTooltip.classList.remove('hidden');
@@ -1681,6 +1825,9 @@ function closeTour() {
   hideNacelleOverlay();
   tourScrim.classList.add('hidden');
   tourTooltip.classList.add('hidden');
+  if (tourPhase === 'aircraft') {
+    showTwinView();
+  }
   if (tourDontShow && tourDontShow.checked) {
     try { localStorage.setItem(TOUR_KEY, '1'); } catch (e) { /* private */ }
   }
@@ -1700,8 +1847,17 @@ function tourOnEngineOpen() {
 
 tourNext.onclick = () => {
   const steps = currentSteps();
-  if (tourIdx < steps.length - 1) { tourIdx += 1; positionTour(); }
-  else closeTour();
+  if (tourPhase === 'fleet' && tourIdx === steps.length - 1) {
+    showTwinView();
+    closeTour();
+    return;
+  }
+  if (tourIdx < steps.length - 1) {
+    tourIdx += 1;
+    positionTour();
+  } else {
+    closeTour();
+  }
 };
 
 tourBack.onclick = () => {
@@ -1713,6 +1869,7 @@ tourBack.onclick = () => {
   /* at first engine step — go back to aircraft tour at the click-engine step */
   if (tourPhase === 'engine') {
     backToAircraft();
+    showTwinView();
     tourPhase = 'aircraft';
     /* find the click-engine step index */
     tourIdx = AIRCRAFT_STEPS.findIndex(s => s.type === 'click-engine');
@@ -1721,56 +1878,9 @@ tourBack.onclick = () => {
   }
 };
 
-/* ---------- view switcher: twin vs fleet ---------- */
-
-const btnViewTwin   = document.getElementById('btn-view-twin');
-const btnViewFleet  = document.getElementById('btn-view-fleet');
-const viewTwin      = document.getElementById('view-twin');
-const viewFleet     = document.getElementById('view-fleet');
-
-function showTwinView() {
-  if (btnViewTwin) {
-    btnViewTwin.classList.add('active');
-    btnViewTwin.setAttribute('aria-selected', 'true');
-  }
-  if (btnViewFleet) {
-    btnViewFleet.classList.remove('active');
-    btnViewFleet.setAttribute('aria-selected', 'false');
-  }
-  if (viewTwin) viewTwin.classList.remove('hidden');
-  if (viewFleet) viewFleet.classList.add('hidden');
-  needsRender = true;
-  if (typeof resize === 'function') resize();
-}
-
-function showFleetView() {
-  if (btnViewFleet) {
-    btnViewFleet.classList.add('active');
-    btnViewFleet.setAttribute('aria-selected', 'true');
-  }
-  if (btnViewTwin) {
-    btnViewTwin.classList.remove('active');
-    btnViewTwin.setAttribute('aria-selected', 'false');
-  }
-  if (viewFleet) viewFleet.classList.remove('hidden');
-  if (viewTwin) viewTwin.classList.add('hidden');
-  needsRender = false;
-  updateFleetCard1();
-}
-
-if (btnViewTwin)   btnViewTwin.onclick = showTwinView;
-if (btnViewFleet)  btnViewFleet.onclick = showFleetView;
-const btnFleetOpenTwin = document.getElementById('btn-fleet-open-twin');
-if (btnFleetOpenTwin) btnFleetOpenTwin.onclick = showTwinView;
-const btnFleetTableTwin = document.getElementById('btn-fleet-table-twin');
-if (btnFleetTableTwin) btnFleetTableTwin.onclick = showTwinView;
-
 const btnHelpTop = document.getElementById('btn-help-top');
 if (btnHelpTop) {
-  btnHelpTop.onclick = () => {
-    showTwinView();
-    openTour();
-  };
+  btnHelpTop.onclick = openTour;
 }
 
 tourSkip.onclick = closeTour;
@@ -1793,7 +1903,7 @@ if (nacelleOverlay) {
 }
 
 /* Clear older tour keys so test users get the new tour on enter */
-['shadowtwin_tour_seen', 'shadowtwin_tour_seen_v2', 'shadowtwin_tour_seen_v3'].forEach(k => {
+['shadowtwin_tour_seen', 'shadowtwin_tour_seen_v2', 'shadowtwin_tour_seen_v3', 'shadowtwin_tour_seen_v4'].forEach(k => {
   try { localStorage.removeItem(k); } catch (e) { /* private */ }
 });
 
