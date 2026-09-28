@@ -134,6 +134,12 @@
 
 <!-- spotlight tour: scrim + tooltip, positioned by JS -->
 <div class="tour-scrim hidden" id="tour-overlay" role="dialog" aria-modal="true" aria-labelledby="tour-tip-title"></div>
+<!-- nacelle pulse ring: shown during click-engine step -->
+<div class="tour-nacelle-pulse hidden" id="tour-nacelle-pulse">
+  <span class="nacelle-ring"></span>
+  <span class="nacelle-ring nacelle-ring--delay"></span>
+  <span class="nacelle-label">Click engine</span>
+</div>
 <div class="tour-tooltip hidden" id="tour-tooltip">
   <p class="tour-eyebrow" id="tour-eyebrow"></p>
   <h2 class="tour-tip-title" id="tour-tip-title"></h2>
@@ -143,7 +149,8 @@
     <div class="tour-dots" id="tour-dots"></div>
     <div class="tour-nav">
       <button class="tour-btn ghost" id="tour-skip">Skip</button>
-      <button class="tour-btn" id="tour-next">Next</button>
+      <button class="tour-btn secondary" id="tour-back">← Back</button>
+      <button class="tour-btn" id="tour-next">Next →</button>
     </div>
   </div>
 </div>

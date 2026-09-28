@@ -1128,6 +1128,8 @@ async function openEngine(side) {
   setInfoTab('readings');
   document.getElementById('sec-parts').classList.remove('hidden');
   paintDetail();
+  // notify tour if the click-engine step is waiting
+  if (typeof tourOnEngineOpen === 'function') tourOnEngineOpen();
 }
 
 function backToAircraft() {
@@ -1217,120 +1219,240 @@ document.getElementById('parts').addEventListener('click', e => {
 
 /* ---------- spotlight guide ---------- */
 
-const TOUR_KEY = 'shadowtwin_tour_seen_v1';
+const TOUR_KEY = 'shadowtwin_tour_seen_v2';
 
-/* Each step: targetId = element to highlight (null = no spotlight, centered tooltip)
-   place = tooltip placement relative to target: 'left'|'right'|'below'|'above'|'center'
-   showDontShow: only last step gets the checkbox */
-const TOUR_STEPS = [
+/* ---- Aircraft-view steps ---- */
+const AIRCRAFT_STEPS = [
   {
     targetId: null,
     place: 'center',
-    eyebrow: 'Shadow Twin — quick guide',
+    eyebrow: 'Shadow Twin \u2014 quick guide',
     title: 'A digital twin for a twin-engine UAV',
     body: 'This dashboard runs a live physics model of both engines side by side with ' +
           'real telemetry, and flags the moment either one drifts from what the model expects. ' +
-          'Five short steps show you around.',
-    showDontShow: false
+          'Six short steps show you around.',
+    showDontShow: false,
+    type: 'normal'
   },
   {
     targetId: 'viewport',
     place: 'right',
-    eyebrow: 'Step 1 of 5 — 3D View',
+    eyebrow: 'Step 1 of 6 \u2014 3D View',
     title: 'The aircraft model',
     body: '<strong>Drag</strong> to rotate, <strong>scroll</strong> to zoom. ' +
-          'Click either engine nacelle on the wing to fly in and inspect that engine up close.',
-    showDontShow: false
+          'The twin nacelles on each wing are the engines. In the next step you\'ll click one.',
+    showDontShow: false,
+    type: 'normal'
+  },
+  {
+    targetId: 'viewport',
+    place: 'right',
+    eyebrow: 'Step 2 of 6 \u2014 Engine Selection',
+    title: 'Click an engine nacelle to inspect it',
+    body: 'The pulsing rings mark the engine nacelles. <strong>Click either one</strong> ' +
+          '(or click an engine card on the right) to fly inside and inspect the engine.',
+    showDontShow: false,
+    type: 'click-engine'   // Next hidden; advances automatically when openEngine() fires
   },
   {
     targetId: 'sec-engines',
     place: 'left',
-    eyebrow: 'Step 2 of 5 — Engine Cards',
-    title: 'Port & Starboard engines',
+    eyebrow: 'Step 3 of 6 \u2014 Engine Cards',
+    title: 'Port & Starboard engine status',
     body: 'Each card shows live status (<strong>Nominal / Watch / Fault</strong>), ' +
           'a health sparkline trend, and remaining-useful-life once the baseline fills. ' +
           'Click a card to open the engine detail view.',
-    showDontShow: false
+    showDontShow: false,
+    type: 'normal'
   },
   {
     targetId: 'mission-banner',
     place: 'left',
-    eyebrow: 'Step 3 of 5 — Mission Status',
+    eyebrow: 'Step 4 of 6 \u2014 Mission Status',
     title: 'Go / No-Go banner',
     body: 'Combines both engines into a single <strong>GO / CAUTION / NO-GO</strong> call ' +
           'for the current sortie. Pair margin and engine-out margin are shown below.',
-    showDontShow: false
+    showDontShow: false,
+    type: 'normal'
   },
   {
     targetId: 'stage-infobar',
     place: 'right',
-    eyebrow: 'Step 4 of 5 — Findings panel',
+    eyebrow: 'Step 5 of 6 \u2014 Findings panel',
     title: 'Findings & Readings',
     body: '<strong>Findings</strong> explains what\'s wrong in plain language. ' +
           '<strong>Readings</strong> shows every sensor channel next to what the physics model ' +
-          'expected — so you can see exactly why a finding was raised.',
-    showDontShow: false
+          'expected \u2014 so you can see exactly why a finding was raised.',
+    showDontShow: false,
+    type: 'normal'
   },
   {
     targetId: 'sec-simulate',
     place: 'left',
-    eyebrow: 'Step 5 of 5 — Simulate',
+    eyebrow: 'Step 6 of 6 \u2014 Simulate',
     title: 'Inject a fault to try it out',
     body: 'Pick <strong>Injector fault</strong>, <strong>Sensor fault</strong>, or ' +
           '<strong>Both engines drift</strong> and watch detection update within seconds. ' +
           '<strong>Clear</strong> resets to nominal.',
-    showDontShow: true
+    showDontShow: true,
+    type: 'normal'
   }
 ];
 
-const tourScrim    = document.getElementById('tour-overlay');   // repurposed as scrim
-const tourTooltip  = document.getElementById('tour-tooltip');
-const tourDots     = document.getElementById('tour-dots');
-const tourNext     = document.getElementById('tour-next');
-const tourSkip     = document.getElementById('tour-skip');
-const tourDontShow = document.getElementById('tour-dontshow-final');
-const tourDontWrap = document.getElementById('tour-dontshow-wrap');
-let tourIdx = 0;
-let tourActive = false;
+/* ---- Engine-view steps (shown after openEngine() during tour) ---- */
+const ENGINE_STEPS = [
+  {
+    targetId: null,
+    place: 'center',
+    eyebrow: 'Engine view',
+    title: 'You\u2019re inside the engine',
+    body: 'The 3D model now shows the engine internals. Flagged components are tinted ' +
+          '\u2014 red for fault, amber for caution. Three more steps walk through the panels.',
+    showDontShow: false,
+    type: 'normal'
+  },
+  {
+    targetId: 'panel-findings',
+    place: 'right',
+    eyebrow: 'Engine step 1 of 3 \u2014 Findings',
+    title: 'What\'s wrong and why',
+    body: '<strong>Findings</strong> names the fault in plain language, which component ' +
+          'is affected, and the confidence level. Sensor faults are listed separately ' +
+          'so they are never confused with engine problems.',
+    showDontShow: false,
+    type: 'normal'
+  },
+  {
+    targetId: 'panel-readings',
+    place: 'right',
+    eyebrow: 'Engine step 2 of 3 \u2014 Readings',
+    title: 'Sensor vs physics model',
+    body: 'Every sensor channel is shown alongside what the physics model expected. ' +
+          'The delta tells you exactly how far the engine has drifted from healthy behaviour.',
+    showDontShow: false,
+    type: 'normal'
+  },
+  {
+    targetId: 'sec-parts',
+    place: 'left',
+    eyebrow: 'Engine step 3 of 3 \u2014 Components',
+    title: 'Flagged components',
+    body: 'Click any component here to zoom the 3D view onto it. Faulted parts are ' +
+          'highlighted in brick-red, caution parts in amber.',
+    showDontShow: true,
+    type: 'normal'
+  }
+];
 
-/* Build progress dots */
-TOUR_STEPS.forEach((_, i) => {
-  const d = document.createElement('span');
-  d.className = 'dot';
-  tourDots.appendChild(d);
-});
+/* ---- State ---- */
+const tourScrim      = document.getElementById('tour-overlay');
+const tourTooltip    = document.getElementById('tour-tooltip');
+const tourDots       = document.getElementById('tour-dots');
+const tourNext       = document.getElementById('tour-next');
+const tourBack       = document.getElementById('tour-back');
+const tourSkip       = document.getElementById('tour-skip');
+const tourDontShow   = document.getElementById('tour-dontshow-final');
+const tourDontWrap   = document.getElementById('tour-dontshow-wrap');
+const nacelleOverlay = document.getElementById('tour-nacelle-pulse');
 
-const PAD = 8;   // spotlight padding around target element in px
+let tourActive    = false;
+let tourPhase     = 'aircraft';   // 'aircraft' | 'engine'
+let tourIdx       = 0;
+let nacelleRafId  = null;
+
+function currentSteps() {
+  return tourPhase === 'engine' ? ENGINE_STEPS : AIRCRAFT_STEPS;
+}
+
+/* Build dots — always re-built when phase changes */
+function buildDots() {
+  tourDots.innerHTML = '';
+  currentSteps().forEach((_, i) => {
+    const d = document.createElement('span');
+    d.className = 'dot';
+    tourDots.appendChild(d);
+  });
+}
+
+const PAD = 8;
+
+/* Project a 3D nacelle world position to CSS screen coordinates */
+function nacelleScreenPos(side) {
+  if (!aircraft) return null;
+  const node = aircraft.getObjectByName('engine_' + side);
+  if (!node) return null;
+  const vec = new THREE.Vector3();
+  node.getWorldPosition(vec);
+  vec.project(camera);
+  const r = canvas.getBoundingClientRect();
+  return {
+    x: r.left + ((vec.x + 1) / 2) * r.width,
+    y: r.top  + ((-vec.y + 1) / 2) * r.height
+  };
+}
+
+/* Animate nacelle rings tracking the 3D objects */
+function tickNacelleOverlay() {
+  const pos = nacelleScreenPos('port') || nacelleScreenPos('starboard');
+  if (pos) {
+    nacelleOverlay.style.left = pos.x + 'px';
+    nacelleOverlay.style.top  = pos.y + 'px';
+  }
+  nacelleRafId = requestAnimationFrame(tickNacelleOverlay);
+}
+
+function showNacelleOverlay() {
+  nacelleOverlay.classList.remove('hidden');
+  if (!nacelleRafId) nacelleRafId = requestAnimationFrame(tickNacelleOverlay);
+}
+
+function hideNacelleOverlay() {
+  nacelleOverlay.classList.add('hidden');
+  if (nacelleRafId) { cancelAnimationFrame(nacelleRafId); nacelleRafId = null; }
+}
 
 function positionTour() {
-  const step = TOUR_STEPS[tourIdx];
+  const steps = currentSteps();
+  const step  = steps[tourIdx];
 
-  /* update text */
+  /* text */
   document.getElementById('tour-eyebrow').textContent   = step.eyebrow;
   document.getElementById('tour-tip-title').textContent = step.title;
   document.getElementById('tour-tip-body').innerHTML    = step.body;
   tourDontWrap.classList.toggle('hidden', !step.showDontShow);
-  tourNext.textContent = tourIdx === TOUR_STEPS.length - 1 ? 'Get started' : 'Next →';
+
+  /* button states */
+  const isLast     = tourIdx === steps.length - 1;
+  const isFirst    = tourIdx === 0 && tourPhase === 'aircraft';
+  const clickEngine = step.type === 'click-engine';
+  tourNext.textContent = isLast ? 'Get started' : 'Next \u2192';
+  tourNext.classList.toggle('hidden', clickEngine);
+  tourBack.classList.toggle('hidden', isFirst);
+
+  /* dots */
+  buildDots();
   Array.from(tourDots.children).forEach((d, i) => d.classList.toggle('active', i === tourIdx));
 
-  /* placement arrow class */
+  /* nacelle pulse */
+  if (clickEngine) { showNacelleOverlay(); } else { hideNacelleOverlay(); }
+
+  /* placement arrow */
   tourTooltip.className = 'tour-tooltip place-' + step.place;
 
   if (!step.targetId) {
-    /* no spotlight: scrim is a full-cover dim, tooltip is centered */
-    tourScrim.style.position = 'fixed';
-    tourScrim.style.top      = '0';
-    tourScrim.style.left     = '0';
-    tourScrim.style.width    = '100vw';
-    tourScrim.style.height   = '100vh';
-    tourScrim.style.borderRadius = '0';
-    tourScrim.style.boxShadow = 'none';
-    tourScrim.style.background = 'rgba(42,46,51,0.50)';
+    /* full-dim, centered tooltip */
+    tourScrim.style.position      = 'fixed';
+    tourScrim.style.top           = '0';
+    tourScrim.style.left          = '0';
+    tourScrim.style.width         = '100vw';
+    tourScrim.style.height        = '100vh';
+    tourScrim.style.borderRadius  = '0';
+    tourScrim.style.boxShadow     = 'none';
+    tourScrim.style.background    = 'rgba(42,46,51,0.50)';
     tourScrim.style.pointerEvents = 'auto';
-
-    tourTooltip.style.top  = '50%';
-    tourTooltip.style.left = '50%';
-    tourTooltip.style.transform = 'translate(-50%,-50%)';
+    tourTooltip.style.top         = '50%';
+    tourTooltip.style.left        = '50%';
+    tourTooltip.style.transform   = 'translate(-50%,-50%)';
     return;
   }
 
@@ -1339,27 +1461,25 @@ function positionTour() {
 
   const target = document.getElementById(step.targetId);
   if (!target) return;
-  const r = target.getBoundingClientRect();
+  const r  = target.getBoundingClientRect();
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const tipW = 300;
   const tipH = tourTooltip.offsetHeight || 220;
 
-  /* position scrim hole */
   const sx = r.left - PAD;
   const sy = r.top  - PAD;
   const sw = r.width  + PAD * 2;
   const sh = r.height + PAD * 2;
-  tourScrim.style.position     = 'fixed';
-  tourScrim.style.top          = sy + 'px';
-  tourScrim.style.left         = sx + 'px';
-  tourScrim.style.width        = sw + 'px';
-  tourScrim.style.height       = sh + 'px';
-  tourScrim.style.borderRadius = '6px';
-  tourScrim.style.boxShadow    = '0 0 0 9999px rgba(42,46,51,0.55)';
+  tourScrim.style.position      = 'fixed';
+  tourScrim.style.top           = sy + 'px';
+  tourScrim.style.left          = sx + 'px';
+  tourScrim.style.width         = sw + 'px';
+  tourScrim.style.height        = sh + 'px';
+  tourScrim.style.borderRadius  = '6px';
+  tourScrim.style.boxShadow     = '0 0 0 9999px rgba(42,46,51,0.55)';
   tourScrim.style.pointerEvents = 'none';
 
-  /* position tooltip */
   const GAP = 16;
   let tx, ty;
   if (step.place === 'left') {
@@ -1371,7 +1491,7 @@ function positionTour() {
   } else if (step.place === 'below') {
     tx = Math.min(vw - tipW - 8, Math.max(8, sx));
     ty = Math.min(vh - tipH - 8, sy + sh + GAP);
-  } else { /* above */
+  } else {
     tx = Math.min(vw - tipW - 8, Math.max(8, sx));
     ty = Math.max(8, sy - tipH - GAP);
   }
@@ -1381,7 +1501,8 @@ function positionTour() {
 }
 
 function openTour() {
-  tourIdx = 0;
+  tourIdx   = 0;
+  tourPhase = 'aircraft';
   tourActive = true;
   tourScrim.classList.remove('hidden');
   tourTooltip.classList.remove('hidden');
@@ -1390,37 +1511,59 @@ function openTour() {
 
 function closeTour() {
   tourActive = false;
+  hideNacelleOverlay();
   tourScrim.classList.add('hidden');
   tourTooltip.classList.add('hidden');
   if (tourDontShow.checked) {
-    try { localStorage.setItem(TOUR_KEY, '1'); } catch (e) { /* private window */ }
+    try { localStorage.setItem(TOUR_KEY, '1'); } catch (e) { /* private */ }
+  }
+}
+
+/* Called by openEngine() when the tour is waiting for an engine click */
+function tourOnEngineOpen() {
+  if (!tourActive) return;
+  const step = AIRCRAFT_STEPS[tourIdx];
+  if (step && step.type === 'click-engine') {
+    /* transition to engine-view tour */
+    tourPhase = 'engine';
+    tourIdx   = 0;
+    positionTour();
   }
 }
 
 tourNext.onclick = () => {
-  if (tourIdx < TOUR_STEPS.length - 1) { tourIdx += 1; positionTour(); }
+  const steps = currentSteps();
+  if (tourIdx < steps.length - 1) { tourIdx += 1; positionTour(); }
   else closeTour();
 };
+
+tourBack.onclick = () => {
+  if (tourIdx > 0) {
+    tourIdx -= 1;
+    positionTour();
+    return;
+  }
+  /* at first engine step — go back to aircraft tour at the click-engine step */
+  if (tourPhase === 'engine') {
+    tourPhase = 'aircraft';
+    /* find the click-engine step index */
+    tourIdx = AIRCRAFT_STEPS.findIndex(s => s.type === 'click-engine');
+    if (tourIdx < 0) tourIdx = 0;
+    positionTour();
+  }
+};
+
 tourSkip.onclick = closeTour;
 document.getElementById('btn-help').onclick = openTour;
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && tourActive) closeTour();
+  if (e.key === 'ArrowRight' && tourActive) tourNext.click();
+  if (e.key === 'ArrowLeft'  && tourActive) tourBack.click();
 });
-/* reposition if window resizes (e.g. panel opens) */
 window.addEventListener('resize', () => { if (tourActive) positionTour(); });
 
-/* step 4 highlight (stage-infobar) only appears when an engine is open;
-   if the user is still in aircraft view, fall back to targeting the canvas */
-function tourTargetForStep(idx) {
-  const step = TOUR_STEPS[idx];
-  if (step.targetId === 'stage-infobar' && view !== 'engine') {
-    return 'viewport';
-  }
-  return step.targetId;
-}
-
 let tourSeen = false;
-try { tourSeen = localStorage.getItem(TOUR_KEY) === '1'; } catch (e) { /* private window */ }
+try { tourSeen = localStorage.getItem(TOUR_KEY) === '1'; } catch (e) { /* private */ }
 if (!tourSeen) openTour();
 
 paint();

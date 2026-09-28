@@ -475,6 +475,55 @@ button:disabled:hover { background: transparent; }
   border-color: transparent;
 }
 .tour-btn.ghost:hover { color: var(--ink); }
+.tour-btn.secondary {
+  background: none;
+  color: var(--ink);
+  border-color: var(--line);
+}
+.tour-btn.secondary:hover { background: var(--line-soft); }
+.tour-btn.hidden { display: none; }
+
+/* ---- nacelle pulse ring (click-engine tour step) ---- */
+.tour-nacelle-pulse {
+  position: fixed;
+  z-index: 202;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+}
+.tour-nacelle-pulse.hidden { display: none; }
+.nacelle-ring {
+  position: absolute;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 2px solid var(--nominal);
+  animation: nacelle-pulse 1.6s ease-out infinite;
+  opacity: 0;
+}
+.nacelle-ring--delay { animation-delay: 0.8s; }
+@keyframes nacelle-pulse {
+  0%   { transform: scale(0.5); opacity: 0.9; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+.nacelle-label {
+  position: absolute;
+  bottom: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--panel);
+  background: var(--nominal);
+  padding: 2px 8px;
+  border-radius: 99px;
+  letter-spacing: 0.03em;
+}
 
 /* ---- side-head layout row (title + live badge) ---- */
 .side-head-row {
