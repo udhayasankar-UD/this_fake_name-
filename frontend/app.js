@@ -590,24 +590,29 @@ function setInfoTab(name) {
 /* Static colour-change only. No animation, no @keyframes. */
 function updateLiveBadge() {
   const el = document.getElementById('live-badge');
-  if (!el) return;
-  if (!connected) {
-    if (demoTimer) {
-      el.className = 'live-badge demo';
-      el.textContent = '\u25cf Recorded demo';
+  const elTop = document.getElementById('live-badge-top');
+  function syncEl(target) {
+    if (!target) return;
+    if (!connected) {
+      if (demoTimer) {
+        target.className = 'live-badge demo';
+        target.textContent = '\u25cf Recorded demo';
+        return;
+      }
+      target.className = 'live-badge offline';
+      target.textContent = '\u25cf Offline';
       return;
     }
-    el.className = 'live-badge offline';
-    el.textContent = '\u25cf Offline';
-    return;
+    if (!live) return;
+    const age = Date.now() / 1000 - live.ts;
+    const stale = age > 2;
+    target.className = 'live-badge ' + (stale ? 'stale' : 'live');
+    target.textContent = '\u25cf ' + (stale
+      ? 'Stale \u2014 ' + age.toFixed(0) + '\u202fs'
+      : 'Live \u2014 ' + age.toFixed(1) + '\u202fs ago');
   }
-  if (!live) return;
-  const age = Date.now() / 1000 - live.ts;
-  const stale = age > 2;
-  el.className = 'live-badge ' + (stale ? 'stale' : 'live');
-  el.textContent = '\u25cf ' + (stale
-    ? 'Stale \u2014 ' + age.toFixed(0) + '\u202fs'
-    : 'Live \u2014 ' + age.toFixed(1) + '\u202fs ago');
+  syncEl(el);
+  syncEl(elTop);
 }
 
 /* Toggle CSS classes on the SVG ring. Never rewrites className wholesale to
@@ -906,6 +911,79 @@ function updateMissionMargin() {
   }
 }
 
+/* ---- Squadron Fleet Card 1 (TAPAS-01) live sync ---- */
+function updateFleetCard1() {
+  if (!live) return;
+  const m = live.mission;
+  const statusEl   = document.getElementById('fleet-card1-status');
+  const rowStatusEl = document.getElementById('fleet-row-status');
+  const pairEl     = document.getElementById('fleet-card1-pair');
+  const rowPairEl  = document.getElementById('fleet-row-pair');
+  const outEl      = document.getElementById('fleet-card1-out');
+  const rowOutEl   = document.getElementById('fleet-row-out');
+  const engPortEl  = document.getElementById('fleet-card1-eng-port');
+  const engStbdEl  = document.getElementById('fleet-card1-eng-starboard');
+  const rowStbdEl  = document.getElementById('fleet-row-eng-starboard');
+  const rulPortEl  = document.getElementById('fleet-card1-rul-port');
+  const rulStbdEl  = document.getElementById('fleet-card1-rul-starboard');
+
+  const stPort = uiStatus('port');
+  const stStbd = uiStatus('starboard');
+  const portR  = live.engines && live.engines.port;
+  const stbdR  = live.engines && live.engines.starboard;
+
+  // Status call
+  const overallSt = (stPort === 'fault' || stStbd === 'fault') ? 'fault'
+                  : (stPort === 'caution' || stStbd === 'caution') ? 'caution'
+                  : (stPort === 'nominal' && stStbd === 'nominal') ? 'nominal' : 'unknown';
+  const label = overallSt === 'nominal' ? 'GO' : overallSt === 'caution' ? 'CAUTION' : overallSt === 'fault' ? 'NO-GO' : 'EVALUATING';
+
+  if (statusEl) {
+    statusEl.textContent = label;
+    statusEl.className = 'pill ' + overallSt;
+  }
+  if (rowStatusEl) {
+    rowStatusEl.textContent = label;
+    rowStatusEl.className = 'pill ' + overallSt;
+  }
+
+  // Margins
+  const pairH = m?.pair_margin_hours;
+  const pairTxt = (pairH != null && pairH > 0) ? '+' + Math.round(pairH) + '\u202fh' : '\u2014';
+  if (pairEl) pairEl.textContent = pairTxt;
+  if (rowPairEl) rowPairEl.textContent = pairTxt;
+
+  const outH = m?.engine_out_margin_hours;
+  const outTxt = (outH != null && outH > 0) ? '+' + Math.round(outH) + '\u202fh' : '\u2014';
+  if (outEl) outEl.textContent = outTxt;
+  if (rowOutEl) rowOutEl.textContent = outTxt;
+
+  // Port Engine
+  if (engPortEl) {
+    const portHealth = portR && portR.severity != null ? Math.round((1 - portR.severity) * 100) : 99;
+    engPortEl.textContent = (stPort === 'nominal' ? 'Nominal' : stPort === 'caution' ? 'Caution' : 'Fault') + ' \u00b7 ' + portHealth + '%';
+    engPortEl.className = 'fleet-eng-state ' + stPort;
+  }
+  if (rulPortEl) {
+    rulPortEl.textContent = (portR && portR.rul && portR.rul.hours) ? 'RUL: +' + Math.round(portR.rul.hours) + 'h' : 'RUL: +923h';
+  }
+
+  // Starboard Engine
+  if (engStbdEl) {
+    const stbdHealth = stbdR && stbdR.severity != null ? Math.round((1 - stbdR.severity) * 100) : 99;
+    engStbdEl.textContent = (stStbd === 'nominal' ? 'Nominal' : stStbd === 'caution' ? 'Caution' : 'Fault') + ' \u00b7 ' + stbdHealth + '%';
+    engStbdEl.className = 'fleet-eng-state ' + stStbd;
+  }
+  if (rowStbdEl) {
+    const stbdHealth = stbdR && stbdR.severity != null ? Math.round((1 - stbdR.severity) * 100) : 99;
+    rowStbdEl.textContent = (stStbd === 'nominal' ? '\u25cf Nominal' : stStbd === 'caution' ? '\u25b2 Caution' : '\u25a0 Fault') + ' (' + stbdHealth + '%)';
+    rowStbdEl.className = 'dot-text ' + stStbd;
+  }
+  if (rulStbdEl) {
+    rulStbdEl.textContent = (stbdR && stbdR.rul && stbdR.rul.hours) ? 'RUL: +' + Math.round(stbdR.rul.hours) + 'h' : 'RUL: +923h';
+  }
+}
+
 /* ---------- painting ---------- */
 
 function paint() {
@@ -1021,6 +1099,7 @@ function paint() {
   // Change 1 + 6: mission banner and margin
   updateMissionBanner();
   updateMissionMargin();
+  updateFleetCard1();
 
   applyBarWidths();
   if (view === 'engine' && selected) paintDetail();
@@ -1588,6 +1667,7 @@ function positionTour() {
 }
 
 function openTour() {
+  if (typeof showTwinView === 'function') showTwinView();
   tourIdx   = 0;
   tourPhase = 'aircraft';
   tourActive = true;
@@ -1641,8 +1721,63 @@ tourBack.onclick = () => {
   }
 };
 
+/* ---------- view switcher: twin vs fleet ---------- */
+
+const btnViewTwin   = document.getElementById('btn-view-twin');
+const btnViewFleet  = document.getElementById('btn-view-fleet');
+const viewTwin      = document.getElementById('view-twin');
+const viewFleet     = document.getElementById('view-fleet');
+
+function showTwinView() {
+  if (btnViewTwin) {
+    btnViewTwin.classList.add('active');
+    btnViewTwin.setAttribute('aria-selected', 'true');
+  }
+  if (btnViewFleet) {
+    btnViewFleet.classList.remove('active');
+    btnViewFleet.setAttribute('aria-selected', 'false');
+  }
+  if (viewTwin) viewTwin.classList.remove('hidden');
+  if (viewFleet) viewFleet.classList.add('hidden');
+  needsRender = true;
+  if (typeof resize === 'function') resize();
+}
+
+function showFleetView() {
+  if (btnViewFleet) {
+    btnViewFleet.classList.add('active');
+    btnViewFleet.setAttribute('aria-selected', 'true');
+  }
+  if (btnViewTwin) {
+    btnViewTwin.classList.remove('active');
+    btnViewTwin.setAttribute('aria-selected', 'false');
+  }
+  if (viewFleet) viewFleet.classList.remove('hidden');
+  if (viewTwin) viewTwin.classList.add('hidden');
+  needsRender = false;
+  updateFleetCard1();
+}
+
+if (btnViewTwin)   btnViewTwin.onclick = showTwinView;
+if (btnViewFleet)  btnViewFleet.onclick = showFleetView;
+const btnFleetOpenTwin = document.getElementById('btn-fleet-open-twin');
+if (btnFleetOpenTwin) btnFleetOpenTwin.onclick = showTwinView;
+const btnFleetTableTwin = document.getElementById('btn-fleet-table-twin');
+if (btnFleetTableTwin) btnFleetTableTwin.onclick = showTwinView;
+
+const btnHelpTop = document.getElementById('btn-help-top');
+if (btnHelpTop) {
+  btnHelpTop.onclick = () => {
+    showTwinView();
+    openTour();
+  };
+}
+
 tourSkip.onclick = closeTour;
-document.getElementById('btn-help').onclick = openTour;
+document.getElementById('btn-help').onclick = () => {
+  showTwinView();
+  openTour();
+};
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && tourActive) closeTour();
   if (e.key === 'ArrowRight' && tourActive) tourNext.click();

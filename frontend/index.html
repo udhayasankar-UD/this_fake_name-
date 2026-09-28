@@ -7,7 +7,30 @@
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-<div class="app">
+<header class="top-nav">
+  <div class="top-nav-brand">
+    <span class="top-nav-badge">DRDO SIH 26054</span>
+    <strong class="top-nav-title">AeroTwin</strong>
+    <span class="top-nav-sep">/</span>
+    <span class="top-nav-platform">TAPAS-BH-201 MALE UAV</span>
+  </div>
+  <div class="top-nav-switcher" role="tablist">
+    <button class="top-nav-tab active" id="btn-view-twin" role="tab" aria-selected="true">
+      <span class="nav-pulse"></span>
+      TAPAS-01 Live Twin
+    </button>
+    <button class="top-nav-tab" id="btn-view-fleet" role="tab" aria-selected="false">
+      <span class="nav-count">4</span>
+      Squadron Fleet Command
+    </button>
+  </div>
+  <div class="top-nav-actions">
+    <button class="help-btn" id="btn-help-top" title="How to use this demo" aria-label="How to use this demo">?</button>
+    <span class="live-badge offline" id="live-badge-top">● Offline</span>
+  </div>
+</header>
+
+<div class="app" id="view-twin">
   <section class="stage">
     <canvas id="viewport"></canvas>
     <div id="labels" aria-live="polite"></div>
@@ -127,6 +150,252 @@
     </div>
   </aside>
 </div>
+
+<!-- Squadron Fleet View (Multi-UAV Command Dashboard) -->
+<main class="fleet-view hidden" id="view-fleet">
+  <div class="fleet-header">
+    <div class="fleet-header-text">
+      <div class="fleet-eyebrow">Defence UAV Ground Control Station · Squadron Health Infrastructure</div>
+      <h2 class="fleet-title">Squadron Propulsion Fleet Command</h2>
+      <p class="fleet-sub">Continuous physics-synchronized health monitoring, anomaly detection, and sortie endurance tracking across active TAPAS-BH-201 airframes.</p>
+    </div>
+    <div class="fleet-kpi-row">
+      <div class="fleet-kpi-card">
+        <span class="fleet-kpi-val">4</span>
+        <span class="fleet-kpi-label">Squadron Aircraft</span>
+        <span class="fleet-kpi-sub">3 Airborne · 1 Depot</span>
+      </div>
+      <div class="fleet-kpi-card">
+        <span class="fleet-kpi-val nominal">75%</span>
+        <span class="fleet-kpi-label">Mission Capable</span>
+        <span class="fleet-kpi-sub">3 of 4 Airworthy (GO)</span>
+      </div>
+      <div class="fleet-kpi-card">
+        <span class="fleet-kpi-val" id="fleet-kpi-margin">+874h</span>
+        <span class="fleet-kpi-label">Average Sortie Margin</span>
+        <span class="fleet-kpi-sub">Dual-Engine Endurance</span>
+      </div>
+      <div class="fleet-kpi-card">
+        <span class="fleet-kpi-val caution">1 Alert</span>
+        <span class="fleet-kpi-label">Fleet Caution</span>
+        <span class="fleet-kpi-sub">TAPAS-03 Stbd EGT</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="fleet-grid">
+    <!-- Card 1: TAPAS-01 -->
+    <div class="fleet-card active-live" id="fleet-card-1">
+      <div class="fleet-card-head">
+        <div>
+          <div class="fleet-card-tag">T-201-B01 · LEAD AIRCRAFT</div>
+          <h3 class="fleet-card-title">TAPAS-01 (Bravo-01)</h3>
+        </div>
+        <span class="pill nominal" id="fleet-card1-status">GO</span>
+      </div>
+      <div class="fleet-badge-live">
+        <span class="nav-pulse"></span> Live CAN Telemetry Feed (10 Hz)
+      </div>
+      <div class="fleet-mission-desc">
+        Border ISR Surveillance · Sortie #42 · FL138 (4,200m) · Throttle: 66%
+      </div>
+      <div class="fleet-engines-status">
+        <div class="fleet-eng-col">
+          <span class="fleet-eng-label">PORT ENGINE</span>
+          <span class="fleet-eng-state nominal" id="fleet-card1-eng-port">Nominal · 99%</span>
+          <span class="fleet-eng-rul" id="fleet-card1-rul-port">RUL: +923h</span>
+        </div>
+        <div class="fleet-eng-col">
+          <span class="fleet-eng-label">STARBOARD ENGINE</span>
+          <span class="fleet-eng-state nominal" id="fleet-card1-eng-starboard">Nominal · 99%</span>
+          <span class="fleet-eng-rul" id="fleet-card1-rul-starboard">RUL: +923h</span>
+        </div>
+      </div>
+      <div class="fleet-margins">
+        <span class="fleet-margin-chip">Pair Margin: <strong id="fleet-card1-pair">+923h</strong></span>
+        <span class="fleet-margin-chip">Engine-Out: <strong id="fleet-card1-out">+923h</strong></span>
+      </div>
+      <button class="fleet-btn primary" id="btn-fleet-open-twin">Inspect Live Digital Twin →</button>
+    </div>
+
+    <!-- Card 2: TAPAS-02 -->
+    <div class="fleet-card" id="fleet-card-2">
+      <div class="fleet-card-head">
+        <div>
+          <div class="fleet-card-tag">T-201-B02 · WING AIRCRAFT</div>
+          <h3 class="fleet-card-title">TAPAS-02 (Bravo-02)</h3>
+        </div>
+        <span class="pill nominal">GO</span>
+      </div>
+      <div class="fleet-badge-live static">
+        Telemetry Stream Active · 10 Hz
+      </div>
+      <div class="fleet-mission-desc">
+        Maritime EEZ Surveillance · Sortie #39 · 3,500m · 138 kts
+      </div>
+      <div class="fleet-engines-status">
+        <div class="fleet-eng-col">
+          <span class="fleet-eng-label">PORT ENGINE</span>
+          <span class="fleet-eng-state nominal">Nominal · 98%</span>
+          <span class="fleet-eng-rul">RUL: +840h</span>
+        </div>
+        <div class="fleet-eng-col">
+          <span class="fleet-eng-label">STARBOARD ENGINE</span>
+          <span class="fleet-eng-state nominal">Nominal · 97%</span>
+          <span class="fleet-eng-rul">RUL: +815h</span>
+        </div>
+      </div>
+      <div class="fleet-margins">
+        <span class="fleet-margin-chip">Pair Margin: <strong>+815h</strong></span>
+        <span class="fleet-margin-chip">Engine-Out: <strong>+815h</strong></span>
+      </div>
+      <div class="fleet-advisory ok">
+        All thermodynamic residuals within ±1.1σ of nominal MVEM physics.
+      </div>
+    </div>
+
+    <!-- Card 3: TAPAS-03 -->
+    <div class="fleet-card caution-border" id="fleet-card-3">
+      <div class="fleet-card-head">
+        <div>
+          <div class="fleet-card-tag">T-201-B03 · RECONNAISSANCE</div>
+          <h3 class="fleet-card-title">TAPAS-03 (Bravo-03)</h3>
+        </div>
+        <span class="pill caution">CAUTION</span>
+      </div>
+      <div class="fleet-badge-live caution">
+        Advisory Flagged by Digital Twin
+      </div>
+      <div class="fleet-mission-desc">
+        High-Altitude Transit · Sortie #18 · 5,100m · 152 kts
+      </div>
+      <div class="fleet-engines-status">
+        <div class="fleet-eng-col">
+          <span class="fleet-eng-label">PORT ENGINE</span>
+          <span class="fleet-eng-state nominal">Nominal · 96%</span>
+          <span class="fleet-eng-rul">RUL: +780h</span>
+        </div>
+        <div class="fleet-eng-col">
+          <span class="fleet-eng-label">STARBOARD ENGINE</span>
+          <span class="fleet-eng-state caution">Caution · 84%</span>
+          <span class="fleet-eng-rul">RUL: +260h</span>
+        </div>
+      </div>
+      <div class="fleet-margins">
+        <span class="fleet-margin-chip">Pair Margin: <strong>+260h</strong></span>
+        <span class="fleet-margin-chip">Engine-Out: <strong>+180h</strong></span>
+      </div>
+      <div class="fleet-advisory warn">
+        Starboard EGT residual +18°C above expected. Injector delivery variance suspected. RTB scheduled at sortie end.
+      </div>
+    </div>
+
+    <!-- Card 4: TAPAS-04 -->
+    <div class="fleet-card maintenance" id="fleet-card-4">
+      <div class="fleet-card-head">
+        <div>
+          <div class="fleet-card-tag">T-201-B04 · GROUND TESTING</div>
+          <h3 class="fleet-card-title">TAPAS-04 (Bravo-04)</h3>
+        </div>
+        <span class="pill unknown">SCHEDULED SERVICE</span>
+      </div>
+      <div class="fleet-badge-live neutral">
+        Hangared · ATR Chitradurga
+      </div>
+      <div class="fleet-mission-desc">
+        50-Hour Periodic Depot Inspection & Transducer Calibration
+      </div>
+      <div class="fleet-engines-status">
+        <div class="fleet-eng-col">
+          <span class="fleet-eng-label">PORT ENGINE</span>
+          <span class="fleet-eng-state unknown">52.4h Run Time</span>
+          <span class="fleet-eng-rul">Check Required</span>
+        </div>
+        <div class="fleet-eng-col">
+          <span class="fleet-eng-label">STARBOARD ENGINE</span>
+          <span class="fleet-eng-state unknown">52.4h Run Time</span>
+          <span class="fleet-eng-rul">Check Required</span>
+        </div>
+      </div>
+      <div class="fleet-margins">
+        <span class="fleet-margin-chip">Status: <strong>Depot Standby</strong></span>
+        <span class="fleet-margin-chip">Clearance: <strong>Pending</strong></span>
+      </div>
+      <div class="fleet-advisory">
+        Oil spectrometry clean. Common-rail pressure calibration and valve clearance checks in progress.
+      </div>
+    </div>
+  </div>
+
+  <!-- Squadron Overview Table -->
+  <div class="fleet-table-wrap">
+    <div class="fleet-table-head">
+      <h3 class="fleet-table-title">Squadron Propulsion Comparison & Sortie Readiness</h3>
+      <span class="fleet-table-note">Synchronized against DRDO SIH PS 26054 Fleet Infrastructure Requirements</span>
+    </div>
+    <table class="fleet-table">
+      <thead>
+        <tr>
+          <th>Airframe ID</th>
+          <th>Sortie / Mission</th>
+          <th>Altitude / OAT</th>
+          <th>Port Engine</th>
+          <th>Starboard Engine</th>
+          <th>Pair Margin</th>
+          <th>Engine-Out</th>
+          <th>Sortie Call</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="highlight-row">
+          <td><strong>TAPAS-01</strong> <span class="sub-tag">T-201-B01</span></td>
+          <td>Border ISR #42</td>
+          <td>4,200m · 12°C</td>
+          <td><span class="dot-text nominal">● Nominal (99%)</span></td>
+          <td><span class="dot-text nominal" id="fleet-row-eng-starboard">● Nominal (99%)</span></td>
+          <td><strong id="fleet-row-pair">+923h</strong></td>
+          <td><strong id="fleet-row-out">+923h</strong></td>
+          <td><span class="pill nominal" id="fleet-row-status">GO</span></td>
+          <td><button class="fleet-row-btn" id="btn-fleet-table-twin">Open Twin →</button></td>
+        </tr>
+        <tr>
+          <td><strong>TAPAS-02</strong> <span class="sub-tag">T-201-B02</span></td>
+          <td>Maritime Patrol #39</td>
+          <td>3,500m · 16°C</td>
+          <td><span class="dot-text nominal">● Nominal (98%)</span></td>
+          <td><span class="dot-text nominal">● Nominal (97%)</span></td>
+          <td>+815h</td>
+          <td>+815h</td>
+          <td><span class="pill nominal">GO</span></td>
+          <td><span class="row-muted">Telemetry Active</span></td>
+        </tr>
+        <tr>
+          <td><strong>TAPAS-03</strong> <span class="sub-tag">T-201-B03</span></td>
+          <td>High-Alt Transit #18</td>
+          <td>5,100m · -4°C</td>
+          <td><span class="dot-text nominal">● Nominal (96%)</span></td>
+          <td><span class="dot-text caution">▲ Caution (84%)</span></td>
+          <td>+260h</td>
+          <td>+180h</td>
+          <td><span class="pill caution">CAUTION</span></td>
+          <td><span class="row-caution">Advisory Active</span></td>
+        </tr>
+        <tr>
+          <td><strong>TAPAS-04</strong> <span class="sub-tag">T-201-B04</span></td>
+          <td>Depot Maintenance</td>
+          <td>Ground ATR</td>
+          <td><span class="dot-text unknown">■ 52.4h Run</span></td>
+          <td><span class="dot-text unknown">■ 52.4h Run</span></td>
+          <td>Pending</td>
+          <td>Pending</td>
+          <td><span class="pill unknown">MAINT</span></td>
+          <td><span class="row-muted">In Hangared Service</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</main>
 <div class="wake-banner hidden" id="wake-banner" role="status" aria-live="polite">
   <span class="wake-text"></span>
   <span class="wake-time"></span>
