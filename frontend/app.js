@@ -1307,14 +1307,14 @@ const ENGINE_STEPS = [
     eyebrow: 'Engine view',
     title: 'You\u2019re inside the engine',
     body: 'The 3D model now shows the engine internals. Flagged components are tinted ' +
-          '\u2014 red for fault, amber for caution. Three more steps walk through the panels.',
+          '\u2014 red for fault, amber for caution. Six more steps walk through every panel.',
     showDontShow: false,
     type: 'normal'
   },
   {
     targetId: 'panel-findings',
     place: 'right',
-    eyebrow: 'Engine step 1 of 3 \u2014 Findings',
+    eyebrow: 'Engine step 1 of 6 \u2014 Findings',
     title: 'What\'s wrong and why',
     body: '<strong>Findings</strong> names the fault in plain language, which component ' +
           'is affected, and the confidence level. Sensor faults are listed separately ' +
@@ -1325,20 +1325,58 @@ const ENGINE_STEPS = [
   {
     targetId: 'panel-readings',
     place: 'right',
-    eyebrow: 'Engine step 2 of 3 \u2014 Readings',
+    eyebrow: 'Engine step 2 of 6 \u2014 Readings',
     title: 'Sensor vs physics model',
-    body: 'Every sensor channel is shown alongside what the physics model expected. ' +
-          'The delta tells you exactly how far the engine has drifted from healthy behaviour.',
+    body: 'Every sensor channel shows its <strong>measured value</strong> alongside what ' +
+          'the physics model expected. The delta tells you exactly how far the engine has ' +
+          'drifted from healthy behaviour at the current operating point.',
     showDontShow: false,
     type: 'normal'
   },
   {
     targetId: 'sec-parts',
     place: 'left',
-    eyebrow: 'Engine step 3 of 3 \u2014 Components',
+    eyebrow: 'Engine step 3 of 6 \u2014 Components',
     title: 'Flagged components',
-    body: 'Click any component here to zoom the 3D view onto it. Faulted parts are ' +
-          'highlighted in brick-red, caution parts in amber.',
+    body: 'Click any component here to zoom the 3D view onto it. <strong>Fault</strong> ' +
+          'parts glow brick-red; <strong>Caution</strong> parts amber. When nothing is ' +
+          'wrong all components stay neutral.',
+    showDontShow: false,
+    type: 'normal'
+  },
+  {
+    targetId: 'sec-margin',
+    place: 'left',
+    eyebrow: 'Engine step 4 of 6 \u2014 Mission margin',
+    title: 'How long can the aircraft keep flying?',
+    body: '<strong>Hours pair margin</strong> is how many hours both engines together can ' +
+          'sustain before one reaches its degradation limit. ' +
+          '<strong>Engine-out margin</strong> is the same figure if one engine is already ' +
+          'lost. Both update live as the twin runs.',
+    showDontShow: false,
+    type: 'normal'
+  },
+  {
+    targetId: 'sec-extra-wrap',
+    place: 'left',
+    eyebrow: 'Engine step 5 of 6 \u2014 Projection',
+    title: 'Remaining useful life & trend',
+    body: '<strong>Projection</strong> shows the remaining-useful-life estimate with a ' +
+          'P10\u2013P90 confidence band, based on the degradation rate the twin is currently ' +
+          'tracking. It is not field-validated; it is driven by the physics model and the ' +
+          'seeded fault severity. Treat it as a relative indicator, not a hard limit.',
+    showDontShow: false,
+    type: 'normal'
+  },
+  {
+    targetId: 'sec-simulate',
+    place: 'left',
+    eyebrow: 'Engine step 6 of 6 \u2014 Simulate',
+    title: 'Inject a fault to try it out',
+    body: 'Pick <strong>Injector fault</strong>, <strong>Sensor fault</strong>, or ' +
+          '<strong>Both engines drift</strong> and watch detection, findings and mission ' +
+          'margin update within a few seconds. <strong>Clear</strong> resets everything ' +
+          'back to nominal.',
     showDontShow: true,
     type: 'normal'
   }
@@ -1461,7 +1499,11 @@ function positionTour() {
 
   const target = document.getElementById(step.targetId);
   if (!target) return;
+  /* temporarily reveal hidden targets so getBoundingClientRect works */
+  const wasHidden = target.classList.contains('hidden');
+  if (wasHidden) target.classList.remove('hidden');
   const r  = target.getBoundingClientRect();
+  if (wasHidden) target.classList.add('hidden');
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const tipW = 300;
