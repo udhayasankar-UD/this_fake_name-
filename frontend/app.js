@@ -294,6 +294,7 @@ function connect() {
   };
   sock.onmessage = ev => {
     try { live = JSON.parse(ev.data); } catch (e) { return; }
+    filterClearingTelemetry();
     paint();
   };
   sock.onclose = () => {
@@ -320,6 +321,63 @@ let demoData = null;
 let demoTimer = null;
 let demo = null;            // { name, idx } while replaying
 let lastSim = 'clear';      // last Simulate button pressed, re-applied on hand-over
+
+/* Cooldown state when clearing faults to prevent lingering rolling-window residuals from flashing transient part faults */
+let isClearing = false;
+let clearStartTime = 0;
+let nominalStreak = 0;
+
+function filterClearingTelemetry() {
+  if (!live || !live.engines) return;
+  if (!isClearing) return;
+
+  const now = performance.now();
+  const elapsed = (now - clearStartTime) / 1000;
+
+  const pRawSt = live.engines.port?.status;
+  const sRawSt = live.engines.starboard?.status;
+  const isRawNominal = (pRawSt === 'nominal' || pRawSt === 'not_evaluated') &&
+                       (sRawSt === 'nominal' || sRawSt === 'not_evaluated');
+
+  if (isRawNominal) {
+    nominalStreak++;
+  } else {
+    nominalStreak = 0;
+  }
+
+  // Only exit clearing mode if backend has been stably nominal for at least 3 seconds (30 frames)
+  // AND at least 10 seconds have elapsed (allowing the 12s residual window to drain),
+  // OR after a hard timeout of 25 seconds.
+  if ((elapsed >= 10 && nominalStreak >= 25) || elapsed >= 25) {
+    isClearing = false;
+    return;
+  }
+
+  // Intermediate state: residual rolling window is decaying. Suppress transient classification spikes:
+  for (const s of ['port', 'starboard']) {
+    const eng = live.engines[s];
+    if (eng && eng.status !== 'nominal') {
+      eng.status = 'nominal';
+      eng.confidence = 1.0;
+      eng.fault = null;
+      eng.parts = {};
+      eng.headline = 'Nominal (Restoring)';
+      eng.detail = 'Fault cleared \u2014 stabilizing baseline telemetry.';
+      if (eng.severity != null && eng.severity > 0) eng.severity = 0;
+    } else if (eng) {
+      eng.parts = {};
+      eng.fault = null;
+      if (eng.severity != null && eng.severity > 0) eng.severity = 0;
+    }
+  }
+  if (live.mission) {
+    live.mission.status = 'nominal';
+    live.mission.detail = 'Sortie margins nominal. Propulsion healthy.';
+  }
+  if (engine) {
+    for (const id of PART_KEYS) tintPart(engine, id, null);
+  }
+}
 
 async function pingBackend() {
   for (let i = 0; i < 150 && !connected; i++) {
@@ -368,6 +426,7 @@ function demoTick() {
   live = Object.assign({}, sc.frames[demo.idx], { ts: Date.now() / 1000 });
   demo.idx += 1;
   if (demo.idx >= sc.frames.length) demo.idx = sc.loop_from || 0;
+  filterClearingTelemetry();
   paint();
 }
 
@@ -385,14 +444,47 @@ function handOverToLive() {
 /* One place for the Simulate buttons: live backend when connected, else the recording. */
 async function runSim(kind) {
   lastSim = kind;
+  if (kind === 'clear') {
+    isClearing = true;
+    clearStartTime = performance.now();
+    nominalStreak = 0;
+    clearExploded(true);
+    if (engine) {
+      for (const id of PART_KEYS) tintPart(engine, id, null);
+    }
+    if (live && live.engines) {
+      for (const s of ['port', 'starboard']) {
+        if (live.engines[s]) {
+          live.engines[s].parts = {};
+          live.engines[s].status = 'nominal';
+          live.engines[s].fault = null;
+          live.engines[s].confidence = 1.0;
+          live.engines[s].headline = 'Nominal';
+          live.engines[s].severity = 0;
+        }
+      }
+    }
+    paint();
+    if (connected) await inject('both', null);
+    return;
+  }
+
+  isClearing = false;
+  nominalStreak = 0;
   if (!connected) {
     if (demo && demoData && demoData.scenarios[kind]) demo = { name: kind, idx: 0 };
     return;
   }
-  if (kind === 'clear') { await inject('both', null); return; }
-  if (kind === 'injector') { await inject('both', null); await inject('port', 'injector_underflow', 0.8); return; }
-  if (kind === 'sensor') { await inject('both', null); await inject('starboard', 'sensor_stuck'); return; }
-  if (kind === 'systemic') { await inject('both', 'turbo_underperformance', 0.75); return; }
+
+  if (appMode === 'single') {
+    if (kind === 'injector') { await inject('both', null); await inject('port', 'injector_underflow', 0.8); return; }
+    if (kind === 'sensor') { await inject('both', null); await inject('port', 'sensor_stuck'); return; }
+    if (kind === 'systemic') { await inject('both', null); await inject('port', 'turbo_underperformance', 0.75); return; }
+  } else {
+    if (kind === 'injector') { await inject('both', null); await inject('port', 'injector_underflow', 0.8); return; }
+    if (kind === 'sensor') { await inject('both', null); await inject('starboard', 'sensor_stuck'); return; }
+    if (kind === 'systemic') { await inject('both', 'turbo_underperformance', 0.75); return; }
+  }
 }
 
 async function inject(side, fault, severity) {
@@ -447,6 +539,10 @@ function explodeDir(node, centre) {
 }
 
 function setExploded(flags, fault) {
+  if (isClearing) {
+    clearExploded(true);
+    return;
+  }
   if (!engine) return;
   const box = new THREE.Box3().setFromObject(engine);
   const centre = box.getCenter(new THREE.Vector3());
@@ -483,9 +579,19 @@ function setExploded(flags, fault) {
   syncCallouts();
 }
 
-function clearExploded() {
-  for (const [, e] of exploded) e.target = 0;
-  animating = true;
+function clearExploded(instant = false) {
+  if (instant) {
+    for (const [id, e] of exploded) {
+      e.target = 0;
+      e.t = 0;
+      e.node.position.copy(e.base);
+    }
+    exploded.clear();
+    animating = false;
+  } else {
+    for (const [, e] of exploded) e.target = 0;
+    animating = true;
+  }
   needsRender = true;
   syncCallouts();
 }
@@ -876,6 +982,26 @@ function updateMissionMargin() {
 
   const m = live?.mission;
 
+  // Single-Engine UAV: pair margin is single powerplant margin, engine-out is N/A
+  if (appMode === 'single') {
+    const portR = live?.engines?.port;
+    const sH = (portR && portR.rul && portR.rul.hours) ? portR.rul.hours : m?.pair_margin_hours;
+    if (sH != null && sH > 0) {
+      pairEl.textContent = '+' + Math.round(sH) + '\u202fh';
+      const cls = sH > 2 ? 'nominal' : 'caution';
+      for (const c of ['nominal', 'caution', 'fault', 'unknown'])
+        pairEl.classList.toggle(c, c === cls);
+    } else {
+      pairEl.textContent = '\u2014';
+      for (const c of ['nominal', 'caution', 'fault', 'unknown'])
+        pairEl.classList.toggle(c, c === 'unknown');
+    }
+    outEl.textContent = 'N/A';
+    for (const c of ['nominal', 'caution', 'fault', 'unknown'])
+      outEl.classList.toggle(c, c === 'unknown');
+    return;
+  }
+
   // pair margin
   const pairH = m?.pair_margin_hours;
   if (pairH != null && pairH > 0) {
@@ -982,6 +1108,40 @@ function updateFleetCard1() {
   if (rulStbdEl) {
     rulStbdEl.textContent = (stbdR && stbdR.rul && stbdR.rul.hours) ? 'RUL: +' + Math.round(stbdR.rul.hours) + 'h' : 'RUL: +923h';
   }
+
+  // Card 2: RUSTOM-01 (Single-Engine Tactical UAV)
+  const c2StatusEl = document.getElementById('fleet-card2-status');
+  const c2EngEl    = document.getElementById('fleet-card2-eng');
+  const c2RulEl    = document.getElementById('fleet-card2-rul');
+  const c2MarginEl = document.getElementById('fleet-card2-margin');
+  const r2StatusEl = document.getElementById('fleet-row-single-status');
+  const r2EngEl    = document.getElementById('fleet-row-single-eng');
+  const r2MarginEl = document.getElementById('fleet-row-single-margin');
+
+  const sEngSt = stPort;
+  const sLabel = sEngSt === 'nominal' ? 'GO' : sEngSt === 'caution' ? 'CAUTION' : sEngSt === 'fault' ? 'NO-GO' : 'EVALUATING';
+  if (c2StatusEl) {
+    c2StatusEl.textContent = sLabel;
+    c2StatusEl.className = 'pill ' + sEngSt;
+  }
+  if (r2StatusEl) {
+    r2StatusEl.textContent = sLabel;
+    r2StatusEl.className = 'pill ' + sEngSt;
+  }
+  if (c2EngEl) {
+    const pHealth = portR && portR.severity != null ? Math.round((1 - portR.severity) * 100) : 99;
+    c2EngEl.textContent = (sEngSt === 'nominal' ? 'Nominal' : sEngSt === 'caution' ? 'Caution' : 'Fault') + ' \u00b7 ' + pHealth + '%';
+    c2EngEl.className = 'fleet-eng-state ' + sEngSt;
+  }
+  if (r2EngEl) {
+    const pHealth = portR && portR.severity != null ? Math.round((1 - portR.severity) * 100) : 99;
+    r2EngEl.textContent = (sEngSt === 'nominal' ? '\u25cf Nominal' : sEngSt === 'caution' ? '\u25b2 Caution' : '\u25a0 Fault') + ' (' + pHealth + '%)';
+    r2EngEl.className = 'dot-text ' + sEngSt;
+  }
+  const sRulH = (portR && portR.rul && portR.rul.hours) ? Math.round(portR.rul.hours) : 890;
+  if (c2RulEl) c2RulEl.textContent = 'RUL: +' + sRulH + 'h \u00b7 Standalone Twin';
+  if (c2MarginEl) c2MarginEl.textContent = '+' + sRulH + 'h';
+  if (r2MarginEl) r2MarginEl.textContent = '+' + sRulH + 'h';
 }
 
 /* ---------- painting ---------- */
@@ -1050,11 +1210,12 @@ function paint() {
     box.innerHTML = '<p class="empty">Waiting for the ground service\u2026</p>';
   } else {
     const items = [];
-    for (const side of ['port', 'starboard']) {
+    const sides = appMode === 'single' ? ['port'] : ['port', 'starboard'];
+    for (const side of sides) {
       const r = live.engines && live.engines[side];
       if (!r) continue;
       const st = uiStatus(side);
-      const name = side === 'port' ? 'Port (Left)' : 'Starboard (Right)';
+      const name = appMode === 'single' ? 'RUSTOM-01 Powerplant' : (side === 'port' ? 'Port (Left)' : 'Starboard (Right)');
 
       if (st === 'nominal') {
         items.push(`<div class="finding ok">
@@ -1084,12 +1245,14 @@ function paint() {
           <div class="conf">Sensor finding, engine health unaffected</div></div>`);
       }
     }
-    const c = live.correlation;
-    if (c && c.kind === 'shared_cause') {
-      items.push(`<div class="finding caution">
-        <div class="t">${c.headline}</div>
-        <div class="d">${c.detail}</div>
-        <div class="conf">Residual similarity ${c.similarity}</div></div>`);
+    if (appMode !== 'single') {
+      const c = live.correlation;
+      if (c && c.kind === 'shared_cause') {
+        items.push(`<div class="finding caution">
+          <div class="t">${c.headline}</div>
+          <div class="d">${c.detail}</div>
+          <div class="conf">Residual similarity ${c.similarity}</div></div>`);
+      }
     }
     box.innerHTML = items.length
       ? items.join('')
@@ -1144,8 +1307,13 @@ function paintDetail() {
   // setExploded and tintPart operate on the 3D model only — they do not touch
   // the readouts or labels DOM. Bug 7 fix in syncCallouts is unaffected.
   if (engine) {
-    for (const id of PART_KEYS) tintPart(engine, id, flags[id] || null);
-    setExploded(flags, r.fault);
+    if (isClearing) {
+      for (const id of PART_KEYS) tintPart(engine, id, null);
+      clearExploded(true);
+    } else {
+      for (const id of PART_KEYS) tintPart(engine, id, flags[id] || null);
+      setExploded(flags, r.fault);
+    }
   }
 
   const extra = document.getElementById('sec-extra');
@@ -1212,6 +1380,7 @@ async function openEngine(side) {
 }
 
 function backToAircraft() {
+  if (appMode === 'single') return;
   view = 'aircraft';
   selected = null;
   document.getElementById('card-port').setAttribute('aria-current', 'false');
@@ -1298,17 +1467,25 @@ document.getElementById('parts').addEventListener('click', e => {
 
 /* ---------- spotlight guide ---------- */
 
-/* ---------- view switcher: twin vs fleet ---------- */
+/* ---------- view switcher: twin vs single vs fleet ---------- */
 
-const btnViewTwin   = document.getElementById('btn-view-twin');
-const btnViewFleet  = document.getElementById('btn-view-fleet');
-const viewTwin      = document.getElementById('view-twin');
-const viewFleet     = document.getElementById('view-fleet');
+let appMode = 'twin'; // 'twin' | 'single' | 'fleet'
+
+const btnViewTwin     = document.getElementById('btn-view-twin');
+const btnViewSingle   = document.getElementById('btn-view-single');
+const btnViewFleet    = document.getElementById('btn-view-fleet');
+const viewTwin        = document.getElementById('view-twin');
+const viewFleet       = document.getElementById('view-fleet');
 
 function showTwinView() {
+  appMode = 'twin';
   if (btnViewTwin) {
     btnViewTwin.classList.add('active');
     btnViewTwin.setAttribute('aria-selected', 'true');
+  }
+  if (btnViewSingle) {
+    btnViewSingle.classList.remove('active');
+    btnViewSingle.setAttribute('aria-selected', 'false');
   }
   if (btnViewFleet) {
     btnViewFleet.classList.remove('active');
@@ -1316,11 +1493,101 @@ function showTwinView() {
   }
   if (viewTwin) viewTwin.classList.remove('hidden');
   if (viewFleet) viewFleet.classList.add('hidden');
+
+  // Restore Starboard entry and restore Port label
+  const entryStbd = document.getElementById('entry-starboard');
+  if (entryStbd) entryStbd.classList.remove('hidden');
+  const namePort = document.getElementById('name-port');
+  if (namePort) namePort.textContent = 'Port (Left)';
+  const hEngines = document.getElementById('sec-engines-heading');
+  if (hEngines) hEngines.textContent = 'Engines';
+  const lPair = document.getElementById('margin-pair-label');
+  if (lPair) lPair.textContent = 'hours pair margin';
+  const lOut = document.getElementById('margin-out-label');
+  if (lOut) lOut.textContent = 'engine-out margin';
+
+  // Restore simulate buttons for twin
+  const bInj = document.getElementById('sim-btn-injector');
+  if (bInj) bInj.textContent = 'Injector fault, port (left)';
+  const bSen = document.getElementById('sim-btn-sensor');
+  if (bSen) bSen.textContent = 'Sensor fault, starboard (right)';
+  const bSys = document.getElementById('sim-btn-systemic');
+  if (bSys) bSys.textContent = 'Both engines drift';
+
+  backToAircraft();
   needsRender = true;
   if (typeof resize === 'function') resize();
 }
 
+async function showSingleView() {
+  appMode = 'single';
+  if (btnViewSingle) {
+    btnViewSingle.classList.add('active');
+    btnViewSingle.setAttribute('aria-selected', 'true');
+  }
+  if (btnViewTwin) {
+    btnViewTwin.classList.remove('active');
+    btnViewTwin.setAttribute('aria-selected', 'false');
+  }
+  if (btnViewFleet) {
+    btnViewFleet.classList.remove('active');
+    btnViewFleet.setAttribute('aria-selected', 'false');
+  }
+  if (viewTwin) viewTwin.classList.remove('hidden');
+  if (viewFleet) viewFleet.classList.add('hidden');
+
+  // Hide starboard engine and update port label to Primary Engine
+  const entryStbd = document.getElementById('entry-starboard');
+  if (entryStbd) entryStbd.classList.add('hidden');
+  const namePort = document.getElementById('name-port');
+  if (namePort) namePort.textContent = 'Primary Engine (2.2L Aero-Diesel)';
+  const hEngines = document.getElementById('sec-engines-heading');
+  if (hEngines) hEngines.textContent = 'Propulsion Unit';
+  const lPair = document.getElementById('margin-pair-label');
+  if (lPair) lPair.textContent = 'Sortie margin';
+  const lOut = document.getElementById('margin-out-label');
+  if (lOut) lOut.textContent = 'Engine-out (N/A)';
+
+  // Update simulate buttons for single engine
+  const bInj = document.getElementById('sim-btn-injector');
+  if (bInj) bInj.textContent = 'Injector fault (Single Engine)';
+  const bSen = document.getElementById('sim-btn-sensor');
+  if (bSen) bSen.textContent = 'Sensor fault (Single Engine)';
+  const bSys = document.getElementById('sim-btn-systemic');
+  if (bSys) bSys.textContent = 'Turbo / boost drift';
+
+  selected = 'port';
+  view = 'engine';
+  document.getElementById('card-port').setAttribute('aria-current', 'true');
+  const cardStbd = document.getElementById('card-starboard');
+  if (cardStbd) cardStbd.setAttribute('aria-current', 'false');
+
+  await loadEngine();
+  if (aircraft) aircraft.visible = false;
+  if (engine) {
+    engine.visible = true;
+    frame(engine, 1.25);
+  }
+
+  document.getElementById('stage-title').textContent = 'RUSTOM-01 \u00b7 Single-Engine UAV';
+  document.getElementById('stage-sub').textContent = '2.2L Aero-Diesel Powerplant (Direct Engine Twin)';
+  document.getElementById('side-title').textContent = 'RUSTOM-01 Propulsion';
+  document.getElementById('side-sub').textContent = 'Single 2.2L Aero-Diesel \u00b7 Live CAN Stream';
+  
+  // Single-engine UAV has no aircraft view to return to; hide the back button
+  document.getElementById('btn-back').classList.add('hidden');
+  document.getElementById('stab-readings').classList.remove('hidden');
+  setInfoTab('readings');
+  document.getElementById('sec-parts').classList.remove('hidden');
+
+  needsRender = true;
+  if (typeof resize === 'function') resize();
+  paintDetail();
+  paint();
+}
+
 function showFleetView() {
+  appMode = 'fleet';
   if (btnViewFleet) {
     btnViewFleet.classList.add('active');
     btnViewFleet.setAttribute('aria-selected', 'true');
@@ -1329,6 +1596,10 @@ function showFleetView() {
     btnViewTwin.classList.remove('active');
     btnViewTwin.setAttribute('aria-selected', 'false');
   }
+  if (btnViewSingle) {
+    btnViewSingle.classList.remove('active');
+    btnViewSingle.setAttribute('aria-selected', 'false');
+  }
   if (viewFleet) viewFleet.classList.remove('hidden');
   if (viewTwin) viewTwin.classList.add('hidden');
   needsRender = false;
@@ -1336,15 +1607,22 @@ function showFleetView() {
 }
 
 if (btnViewTwin)   btnViewTwin.onclick = showTwinView;
+if (btnViewSingle) btnViewSingle.onclick = showSingleView;
 if (btnViewFleet)  btnViewFleet.onclick = showFleetView;
+
 const btnFleetOpenTwin = document.getElementById('btn-fleet-open-twin');
 if (btnFleetOpenTwin) btnFleetOpenTwin.onclick = showTwinView;
+const btnFleetOpenSingle = document.getElementById('btn-fleet-open-single');
+if (btnFleetOpenSingle) btnFleetOpenSingle.onclick = showSingleView;
+
 const btnFleetTableTwin = document.getElementById('btn-fleet-table-twin');
 if (btnFleetTableTwin) btnFleetTableTwin.onclick = showTwinView;
+const btnFleetTableSingle = document.getElementById('btn-fleet-table-single');
+if (btnFleetTableSingle) btnFleetTableSingle.onclick = showSingleView;
 
 /* ---------- spotlight guide ---------- */
 
-const TOUR_KEY = 'shadowtwin_tour_seen_v5';
+const TOUR_KEY = 'shadowtwin_tour_seen_v6';
 
 /* ---- Aircraft-view steps ---- */
 const AIRCRAFT_STEPS = [
@@ -1363,7 +1641,7 @@ const AIRCRAFT_STEPS = [
   {
     targetId: 'viewport',
     place: 'right',
-    eyebrow: 'Aircraft Step 1 of 8 \u2014 3D Airframe',
+    eyebrow: 'Aircraft Step 1 of 9 \u2014 3D Airframe',
     title: 'TAPAS-BH-201 3D Airframe',
     body: '<strong>Drag</strong> to orbit, <strong>scroll</strong> to zoom. ' +
           'The twin wing-mounted nacelles house the 2.2\u202fL turbo-diesel aero powerplants.',
@@ -1374,7 +1652,7 @@ const AIRCRAFT_STEPS = [
   {
     targetId: 'mission-banner',
     place: 'left',
-    eyebrow: 'Aircraft Step 2 of 8 \u2014 Go / No-Go Banner',
+    eyebrow: 'Aircraft Step 2 of 9 \u2014 Go / No-Go Banner',
     title: 'Mission readiness at a glance',
     body: 'Combines health across both engines into a single operational call: ' +
           '<strong>GO</strong>, <strong>CAUTION</strong>, or <strong>NO-GO</strong>. ' +
@@ -1386,7 +1664,7 @@ const AIRCRAFT_STEPS = [
   {
     targetId: 'sec-engines',
     place: 'left',
-    eyebrow: 'Aircraft Step 3 of 8 \u2014 Engine Status',
+    eyebrow: 'Aircraft Step 3 of 9 \u2014 Engine Status',
     title: 'Port & Starboard engines',
     body: 'Each card shows live status (<strong>Nominal / Caution / Fault</strong>), ' +
           'health sparkline trend, and remaining useful life. You can monitor whether one or both engines are degrading.',
@@ -1397,7 +1675,7 @@ const AIRCRAFT_STEPS = [
   {
     targetId: 'sec-margin',
     place: 'left',
-    eyebrow: 'Aircraft Step 4 of 8 \u2014 Mission Margin',
+    eyebrow: 'Aircraft Step 4 of 9 \u2014 Mission Margin',
     title: 'Sortie endurance margins',
     body: '<strong>Hours pair margin</strong> shows how many flight hours both engines together can sustain before hitting limits. ' +
           '<strong>Engine-out margin</strong> shows endurance if one engine failed.',
@@ -1408,7 +1686,7 @@ const AIRCRAFT_STEPS = [
   {
     targetId: 'sec-simulate',
     place: 'left',
-    eyebrow: 'Aircraft Step 5 of 8 \u2014 Simulate',
+    eyebrow: 'Aircraft Step 5 of 9 \u2014 Simulate',
     title: 'Live fault injection',
     body: 'Test how the twin responds. Inject an <strong>Injector fault</strong>, <strong>Sensor fault</strong>, or ' +
           '<strong>Both engines drift</strong> to see live detection and mission margins update. <strong>Clear</strong> resets to nominal.',
@@ -1417,11 +1695,21 @@ const AIRCRAFT_STEPS = [
     view: 'twin'
   },
   {
+    targetId: 'btn-view-single',
+    place: 'below',
+    eyebrow: 'Aircraft Step 6 of 9 \u2014 Single-Engine UAV',
+    title: 'Single-Engine Tactical UAV',
+    body: 'Switch to a standalone single-engine tactical UAV (Rustom-1 / Archer class) to inspect the 2.2L aero-diesel powerplant directly without requiring the aircraft airframe.',
+    showDontShow: false,
+    type: 'normal',
+    view: 'twin'
+  },
+  {
     targetId: 'btn-view-fleet',
     place: 'below',
-    eyebrow: 'Aircraft Step 6 of 8 \u2014 Fleet Navigation',
+    eyebrow: 'Aircraft Step 7 of 9 \u2014 Fleet Navigation',
     title: 'Multi-UAV fleet switching',
-    body: 'Use this top switcher to toggle between the <strong>TAPAS-01 Live Twin</strong> and the <strong>Squadron Fleet Command</strong> dashboard to oversee all 4 UAVs simultaneously.',
+    body: 'Use this top switcher to toggle between the <strong>Twin-Engine TAPAS-01</strong>, <strong>Single-Engine RUSTOM-01</strong>, and the <strong>Squadron Fleet Command</strong> dashboard.',
     showDontShow: false,
     type: 'normal',
     view: 'twin'
@@ -1429,9 +1717,9 @@ const AIRCRAFT_STEPS = [
   {
     targetId: 'fleet-card-1',
     place: 'right',
-    eyebrow: 'Aircraft Step 7 of 8 \u2014 Squadron Fleet Command',
+    eyebrow: 'Aircraft Step 8 of 9 \u2014 Squadron Fleet Command',
     title: 'Monitor 4 UAVs in a single dashboard',
-    body: 'The twin scales across the entire squadron. Here you can monitor all 4 MALE UAVs simultaneously \u2014 tracking propulsion health, operational readiness (GO / CAUTION / NO-GO), and sortie margins in real time. TAPAS-03 is flagged for Starboard EGT drift.',
+    body: 'The twin scales across the entire squadron. Here you can monitor all 4 MALE and tactical UAVs simultaneously \u2014 tracking propulsion health, operational readiness (GO / CAUTION / NO-GO), and sortie margins in real time. TAPAS-03 is flagged for Starboard EGT drift.',
     showDontShow: false,
     type: 'normal',
     view: 'fleet'
@@ -1439,13 +1727,67 @@ const AIRCRAFT_STEPS = [
   {
     targetId: 'viewport',
     place: 'right',
-    eyebrow: 'Aircraft Step 8 of 8 \u2014 Engine Inspection',
+    eyebrow: 'Aircraft Step 9 of 9 \u2014 Engine Inspection',
     title: 'Click an engine nacelle to fly inside',
     body: 'Back on lead aircraft TAPAS-01: the pulsing rings mark the engine nacelles. <strong>Click either engine nacelle</strong> ' +
           '(or click an engine card on the right) to fly inside and inspect the engine internals!',
     showDontShow: false,
     type: 'click-engine',
     view: 'twin'
+  }
+];
+
+/* ---- Single-engine-view steps (shown when tour is opened in Single-engine view) ---- */
+const SINGLE_STEPS = [
+  {
+    targetId: null,
+    place: 'center',
+    eyebrow: 'RUSTOM-01 \u2014 Single-Engine UAV',
+    title: 'Standalone Engine Digital Twin',
+    body: 'This platform monitors a single-engine tactical UAV powerplant directly in 3D without requiring the aircraft airframe. All CAN telemetry and physics models connect to the primary 2.2L aero-diesel unit.',
+    showDontShow: false,
+    type: 'normal',
+    view: 'single'
+  },
+  {
+    targetId: 'card-port',
+    place: 'left',
+    eyebrow: 'Single-Engine Step 1 of 4 \u2014 Propulsion Health',
+    title: 'Primary engine status',
+    body: 'Real-time propulsion health index, RUL projection strip, and confidence metrics for the single powerplant.',
+    showDontShow: false,
+    type: 'normal',
+    view: 'single'
+  },
+  {
+    targetId: 'panel-readings',
+    place: 'right',
+    eyebrow: 'Single-Engine Step 2 of 4 \u2014 Telemetry vs Physics',
+    title: 'Mean Value Engine Model',
+    body: 'Compares real-time sensor measurements against expected physics at the current operating point to detect early drift.',
+    showDontShow: false,
+    type: 'normal',
+    view: 'single'
+  },
+  {
+    targetId: 'sec-parts',
+    place: 'left',
+    eyebrow: 'Single-Engine Step 3 of 4 \u2014 Internal Diagnostics',
+    title: 'Flagged components',
+    body: 'When degradation occurs, affected components highlight in brick-red or amber and pop out in 3D exploded view with diagnostic callouts.',
+    showDontShow: false,
+    type: 'normal',
+    view: 'single'
+  },
+  {
+    targetId: 'btn-view-twin',
+    place: 'below',
+    eyebrow: 'Single-Engine Step 4 of 4 \u2014 Switch to Twin Airframe',
+    title: 'Switch between UAV classes',
+    body: 'Click <strong>TAPAS-01 Twin-Engine UAV</strong> at any time to switch to the twin wing-mounted airframe.',
+    showDontShow: true,
+    type: 'normal',
+    view: 'single'
   }
 ];
 
@@ -1632,6 +1974,7 @@ let nacelleRafId  = null;
 
 function currentSteps() {
   if (tourPhase === 'fleet') return FLEET_STEPS;
+  if (tourPhase === 'single') return SINGLE_STEPS;
   return tourPhase === 'engine' ? ENGINE_STEPS : AIRCRAFT_STEPS;
 }
 
@@ -1690,6 +2033,8 @@ function positionTour() {
   /* Switch view if step specifies one */
   if (step.view === 'fleet' && typeof showFleetView === 'function') {
     showFleetView();
+  } else if (step.view === 'single' && typeof showSingleView === 'function') {
+    showSingleView();
   } else if (step.view === 'twin' && typeof showTwinView === 'function') {
     showTwinView();
   }
@@ -1702,7 +2047,7 @@ function positionTour() {
 
   /* button states */
   const isLast      = tourIdx === steps.length - 1;
-  const isFirst     = tourIdx === 0 && (tourPhase === 'aircraft' || tourPhase === 'fleet');
+  const isFirst     = tourIdx === 0 && (tourPhase === 'aircraft' || tourPhase === 'fleet' || tourPhase === 'single');
   const clickEngine = step.type === 'click-engine';
   tourNext.textContent = isLast ? 'Finish' : 'Next \u2192';
   tourNext.classList.toggle('hidden', clickEngine);
@@ -1762,7 +2107,7 @@ function positionTour() {
   }
 
   /* Scroll target into view with centering so it's fully visible in sidebar or container */
-  if (step.targetId !== 'btn-view-fleet' && step.targetId !== 'btn-view-twin') {
+  if (step.targetId !== 'btn-view-fleet' && step.targetId !== 'btn-view-twin' && step.targetId !== 'btn-view-single') {
     target.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
   }
 
@@ -1809,6 +2154,8 @@ function positionTour() {
 function openTour() {
   if (viewFleet && !viewFleet.classList.contains('hidden')) {
     tourPhase = 'fleet';
+  } else if (appMode === 'single') {
+    tourPhase = 'single';
   } else {
     showTwinView();
     tourPhase = 'aircraft';
@@ -1825,7 +2172,7 @@ function closeTour() {
   hideNacelleOverlay();
   tourScrim.classList.add('hidden');
   tourTooltip.classList.add('hidden');
-  if (tourPhase === 'aircraft') {
+  if (tourPhase === 'aircraft' && appMode !== 'single') {
     showTwinView();
   }
   if (tourDontShow && tourDontShow.checked) {
@@ -1847,8 +2194,8 @@ function tourOnEngineOpen() {
 
 tourNext.onclick = () => {
   const steps = currentSteps();
-  if (tourPhase === 'fleet' && tourIdx === steps.length - 1) {
-    showTwinView();
+  if ((tourPhase === 'fleet' || tourPhase === 'single') && tourIdx === steps.length - 1) {
+    if (tourPhase === 'fleet') showTwinView();
     closeTour();
     return;
   }
@@ -1903,7 +2250,7 @@ if (nacelleOverlay) {
 }
 
 /* Clear older tour keys so test users get the new tour on enter */
-['shadowtwin_tour_seen', 'shadowtwin_tour_seen_v2', 'shadowtwin_tour_seen_v3', 'shadowtwin_tour_seen_v4'].forEach(k => {
+['shadowtwin_tour_seen', 'shadowtwin_tour_seen_v2', 'shadowtwin_tour_seen_v3', 'shadowtwin_tour_seen_v4', 'shadowtwin_tour_seen_v5'].forEach(k => {
   try { localStorage.removeItem(k); } catch (e) { /* private */ }
 });
 

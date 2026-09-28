@@ -17,7 +17,11 @@
   <div class="top-nav-switcher" role="tablist">
     <button class="top-nav-tab active" id="btn-view-twin" role="tab" aria-selected="true">
       <span class="nav-pulse"></span>
-      TAPAS-01 Live Twin
+      TAPAS-01 Twin-Engine UAV
+    </button>
+    <button class="top-nav-tab" id="btn-view-single" role="tab" aria-selected="false">
+      <span class="nav-icon">⚙</span>
+      RUSTOM-01 Single-Engine UAV
     </button>
     <button class="top-nav-tab" id="btn-view-fleet" role="tab" aria-selected="false">
       <span class="nav-count">4</span>
@@ -82,14 +86,14 @@
     </div>
 
     <div class="section" id="sec-engines">
-      <h3>Engines</h3>
-      <div class="engine-entry">
+      <h3 id="sec-engines-heading">Engines</h3>
+      <div class="engine-entry" id="entry-port">
         <button class="engine-card" id="card-port" aria-current="false">
           <svg class="status-ring unknown" id="ring-port" width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">
             <circle cx="11" cy="11" r="8"/>
           </svg>
           <span class="label">
-            <span class="name">Port (Left)</span><br />
+            <span class="name" id="name-port">Port (Left)</span><br />
             <span class="state" id="state-port">Not evaluated</span>
           </span>
           <span class="inspect-hint">Inspect &rarr;</span>
@@ -98,13 +102,13 @@
         </button>
         <div class="engine-rul" id="rul-port"></div>
       </div>
-      <div class="engine-entry">
+      <div class="engine-entry" id="entry-starboard">
         <button class="engine-card" id="card-starboard" aria-current="false">
           <svg class="status-ring unknown" id="ring-starboard" width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">
             <circle cx="11" cy="11" r="8"/>
           </svg>
           <span class="label">
-            <span class="name">Starboard (Right)</span><br />
+            <span class="name" id="name-starboard">Starboard (Right)</span><br />
             <span class="state" id="state-starboard">Not evaluated</span>
           </span>
           <span class="inspect-hint">Inspect &rarr;</span>
@@ -120,11 +124,11 @@
       <div class="margin-display">
         <div class="margin-pair">
           <span class="margin-value unknown" id="margin-pair-val">—</span>
-          <span class="margin-label">hours pair margin</span>
+          <span class="margin-label" id="margin-pair-label">hours pair margin</span>
         </div>
         <div class="margin-out">
           <span class="margin-value secondary unknown" id="margin-out-val">—</span>
-          <span class="margin-label">engine-out margin</span>
+          <span class="margin-label" id="margin-out-label">engine-out margin</span>
         </div>
       </div>
     </div>
@@ -143,9 +147,9 @@
       <h3>Simulate</h3>
       <div class="sim-grid">
         <button class="sim-clear" data-sim="clear">Clear</button>
-        <button data-sim="injector">Injector fault, port (left)</button>
-        <button data-sim="sensor">Sensor fault, starboard (right)</button>
-        <button data-sim="systemic">Both engines drift</button>
+        <button data-sim="injector" id="sim-btn-injector">Injector fault, port (left)</button>
+        <button data-sim="sensor" id="sim-btn-sensor">Sensor fault, starboard (right)</button>
+        <button data-sim="systemic" id="sim-btn-systemic">Both engines drift</button>
       </div>
     </div>
   </aside>
@@ -218,40 +222,33 @@
       <button class="fleet-btn primary" id="btn-fleet-open-twin">Inspect Live Digital Twin →</button>
     </div>
 
-    <!-- Card 2: TAPAS-02 -->
+    <!-- Card 2: RUSTOM-01 (Single-Engine Tactical UAV) -->
     <div class="fleet-card" id="fleet-card-2">
       <div class="fleet-card-head">
         <div>
-          <div class="fleet-card-tag">T-201-B02 · WING AIRCRAFT</div>
-          <h3 class="fleet-card-title">TAPAS-02 (Bravo-02)</h3>
+          <div class="fleet-card-tag">R-101-A01 · SINGLE-ENGINE TACTICAL UAV</div>
+          <h3 class="fleet-card-title">RUSTOM-01 (Alpha-01)</h3>
         </div>
-        <span class="pill nominal">GO</span>
+        <span class="pill nominal" id="fleet-card2-status">GO</span>
       </div>
       <div class="fleet-badge-live static">
-        Telemetry Stream Active · 10 Hz
+        Single-Engine Powerplant · 10 Hz CAN
       </div>
       <div class="fleet-mission-desc">
-        Maritime EEZ Surveillance · Sortie #39 · 3,500m · 138 kts
+        Tactical Reconnaissance · Sortie #27 · 2,800m · Single Aero-Diesel
       </div>
-      <div class="fleet-engines-status">
+      <div class="fleet-engines-status single">
         <div class="fleet-eng-col">
-          <span class="fleet-eng-label">PORT ENGINE</span>
-          <span class="fleet-eng-state nominal">Nominal · 98%</span>
-          <span class="fleet-eng-rul">RUL: +840h</span>
-        </div>
-        <div class="fleet-eng-col">
-          <span class="fleet-eng-label">STARBOARD ENGINE</span>
-          <span class="fleet-eng-state nominal">Nominal · 97%</span>
-          <span class="fleet-eng-rul">RUL: +815h</span>
+          <span class="fleet-eng-label">PRIMARY POWERPLANT (2.2L AERO-DIESEL)</span>
+          <span class="fleet-eng-state nominal" id="fleet-card2-eng">Nominal · 99%</span>
+          <span class="fleet-eng-rul" id="fleet-card2-rul">RUL: +890h · Standalone Twin</span>
         </div>
       </div>
       <div class="fleet-margins">
-        <span class="fleet-margin-chip">Pair Margin: <strong>+815h</strong></span>
-        <span class="fleet-margin-chip">Engine-Out: <strong>+815h</strong></span>
+        <span class="fleet-margin-chip">Sortie Margin: <strong id="fleet-card2-margin">+890h</strong></span>
+        <span class="fleet-margin-chip">Platform: <strong>Single Engine Direct Twin</strong></span>
       </div>
-      <div class="fleet-advisory ok">
-        All thermodynamic residuals within ±1.1σ of nominal MVEM physics.
-      </div>
+      <button class="fleet-btn" id="btn-fleet-open-single">Inspect Single-Engine UAV →</button>
     </div>
 
     <!-- Card 3: TAPAS-03 -->
@@ -360,15 +357,15 @@
           <td><button class="fleet-row-btn" id="btn-fleet-table-twin">Open Twin →</button></td>
         </tr>
         <tr>
-          <td><strong>TAPAS-02</strong> <span class="sub-tag">T-201-B02</span></td>
-          <td>Maritime Patrol #39</td>
-          <td>3,500m · 16°C</td>
-          <td><span class="dot-text nominal">● Nominal (98%)</span></td>
-          <td><span class="dot-text nominal">● Nominal (97%)</span></td>
-          <td>+815h</td>
-          <td>+815h</td>
-          <td><span class="pill nominal">GO</span></td>
-          <td><span class="row-muted">Telemetry Active</span></td>
+          <td><strong>RUSTOM-01</strong> <span class="sub-tag">R-101-A01</span></td>
+          <td>Tactical Recon #27</td>
+          <td>2,800m · 18°C</td>
+          <td><span class="dot-text nominal" id="fleet-row-single-eng">● Nominal (99%)</span></td>
+          <td><span class="row-muted">N/A (Single Engine)</span></td>
+          <td><strong id="fleet-row-single-margin">+890h</strong></td>
+          <td><span class="row-muted">N/A (Single)</span></td>
+          <td><span class="pill nominal" id="fleet-row-single-status">GO</span></td>
+          <td><button class="fleet-row-btn" id="btn-fleet-table-single">Open Twin →</button></td>
         </tr>
         <tr>
           <td><strong>TAPAS-03</strong> <span class="sub-tag">T-201-B03</span></td>

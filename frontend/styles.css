@@ -873,6 +873,11 @@ button:disabled:hover { background: transparent; }
   padding: 1px 5px;
   border-radius: 99px;
 }
+.nav-icon {
+  font-size: 13px;
+  line-height: 1;
+  display: inline-block;
+}
 .top-nav-actions {
   display: flex;
   align-items: center;
@@ -1040,6 +1045,9 @@ button:disabled:hover { background: transparent; }
   grid-template-columns: 1fr 1fr;
   gap: 8px;
   margin-bottom: 12px;
+}
+.fleet-engines-status.single {
+  grid-template-columns: 1fr;
 }
 .fleet-eng-col {
   background: var(--paper);
