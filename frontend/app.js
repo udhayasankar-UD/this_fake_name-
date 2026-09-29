@@ -74,6 +74,28 @@ function resize() {
 }
 window.addEventListener('resize', () => { resize(); });
 
+/* camera animation state for fluid component and view transitions */
+let camAnim = null; // { startPos, endPos, startTarget, endTarget, startTime, duration }
+
+function animateCameraTo(targetPos, targetLookAt, duration = 380) {
+  if (reduceMotion || duration <= 0) {
+    camera.position.copy(targetPos);
+    controls.target.copy(targetLookAt);
+    controls.update();
+    needsRender = true;
+    return;
+  }
+  camAnim = {
+    startPos: camera.position.clone(),
+    endPos: targetPos.clone(),
+    startTarget: controls.target.clone(),
+    endTarget: targetLookAt.clone(),
+    startTime: performance.now(),
+    duration: duration
+  };
+  needsRender = true;
+}
+
 /* render loop: on demand, frame-capped, paused when hidden */
 let last = 0;
 const interval = 1000 / cfg.fps;
@@ -83,9 +105,20 @@ function loop(t) {
   if (t - last < interval) return;
   last = t;
   resize();
-  if (controls.enableDamping) controls.update();
+  if (camAnim) {
+    const now = performance.now();
+    const progress = Math.min(1, (now - camAnim.startTime) / camAnim.duration);
+    const ease = 0.5 - Math.cos(progress * Math.PI) / 2;
+    camera.position.lerpVectors(camAnim.startPos, camAnim.endPos, ease);
+    controls.target.lerpVectors(camAnim.startTarget, camAnim.endTarget, ease);
+    controls.update();
+    needsRender = true;
+    if (progress >= 1) camAnim = null;
+  } else if (controls.enableDamping) {
+    controls.update();
+  }
   stepExplode();
-  if (needsRender || controls.enableDamping) {
+  if (needsRender || controls.enableDamping || camAnim) {
     renderer.render(scene, camera);
     positionCallouts();
     needsRender = false;
@@ -123,6 +156,7 @@ function baseMaterial(mesh) {
 function tintPart(root, name, status) {
   const node = root.getObjectByName(name);
   if (!node) return;
+  const isPartFocused = (root === engine && name === focusedPartId);
   node.traverse(o => {
     if (!o.isMesh) return;
     if (!o.userData.matClone) { o.material = o.material.clone(); o.userData.matClone = true; }
@@ -130,6 +164,9 @@ function tintPart(root, name, status) {
     if (status && COLOR[status]) {
       o.material.color.copy(base).lerp(COLOR[status], 0.72);
       o.material.emissive = COLOR[status].clone().multiplyScalar(0.06);
+    } else if (isPartFocused) {
+      o.material.color.copy(base).lerp(new THREE.Color(0.92, 0.78, 0.36), 0.55);
+      if (o.material.emissive) o.material.emissive.setRGB(0.20, 0.16, 0.06);
     } else {
       o.material.color.copy(base);
       if (o.material.emissive) o.material.emissive.setRGB(0, 0, 0);
@@ -624,7 +661,33 @@ function stepExplode() {
 
 const labelBox = document.getElementById('labels');
 const calloutEls = new Map();
+let focusCalloutEl = null;
+let focusedPartId = null;
 const _v = new THREE.Vector3();
+
+function updateFocusCallout() {
+  if (!focusedPartId || !engine) {
+    if (focusCalloutEl) {
+      focusCalloutEl.remove();
+      focusCalloutEl = null;
+    }
+    return;
+  }
+  if (!focusCalloutEl) {
+    focusCalloutEl = document.createElement('div');
+    focusCalloutEl.className = 'callout focused';
+    focusCalloutEl.innerHTML = `<span class="cname"></span><span class="cnote"></span>`;
+    labelBox.appendChild(focusCalloutEl);
+  }
+  const cfg = PART_FOCUS_CONFIG[focusedPartId];
+  const name = PART_LABEL[focusedPartId] || focusedPartId;
+  const desc = cfg ? '\u2014\u00a0' + cfg.desc : '';
+  const nameEl = focusCalloutEl.querySelector('.cname');
+  const noteEl = focusCalloutEl.querySelector('.cnote');
+  if (nameEl.textContent !== name) nameEl.textContent = name;
+  if (noteEl.textContent !== desc) noteEl.textContent = desc;
+  needsRender = true;
+}
 
 function syncCallouts() {
   for (const [id, el] of [...calloutEls]) {
@@ -657,20 +720,35 @@ function syncCallouts() {
 }
 
 function positionCallouts() {
-  if (!calloutEls.size) return;
   const w = canvas.clientWidth, h = canvas.clientHeight;
-  for (const [id, el] of calloutEls) {
-    const e = exploded.get(id);
-    if (!e) continue;
-    const box = new THREE.Box3().setFromObject(e.node);
-    box.getCenter(_v);
-    _v.project(camera);
-    const x = (_v.x * 0.5 + 0.5) * w;
-    const y = (-_v.y * 0.5 + 0.5) * h;
-    const visible = _v.z < 1 && e.t > 0.25;
-    el.style.left = x + 'px';
-    el.style.top = y + 'px';
-    el.classList.toggle('shown', visible);
+  if (calloutEls.size) {
+    for (const [id, el] of calloutEls) {
+      const e = exploded.get(id);
+      if (!e) continue;
+      const box = new THREE.Box3().setFromObject(e.node);
+      box.getCenter(_v);
+      _v.project(camera);
+      const x = (_v.x * 0.5 + 0.5) * w;
+      const y = (-_v.y * 0.5 + 0.5) * h;
+      const visible = _v.z < 1 && e.t > 0.25;
+      el.style.left = x + 'px';
+      el.style.top = y + 'px';
+      el.classList.toggle('shown', visible);
+    }
+  }
+  if (focusCalloutEl && focusedPartId && engine) {
+    const node = engine.getObjectByName(focusedPartId);
+    if (node) {
+      const box = new THREE.Box3().setFromObject(node);
+      box.getCenter(_v);
+      _v.project(camera);
+      const x = (_v.x * 0.5 + 0.5) * w;
+      const y = (-_v.y * 0.5 + 0.5) * h;
+      const visible = _v.z < 1;
+      focusCalloutEl.style.left = x + 'px';
+      focusCalloutEl.style.top = y + 'px';
+      focusCalloutEl.classList.toggle('shown', visible);
+    }
   }
 }
 
@@ -1331,7 +1409,8 @@ function paintDetail() {
     const st = flags[id];
     const cls = st === 'fault' ? ' flagged' : st === 'caution' ? ' watch' : '';
     const note = st === 'fault' ? 'Flagged' : st === 'caution' ? 'Watch' : '';
-    return `<button class="part${cls}" data-part="${id}">
+    const isFoc = (id === focusedPartId) ? ' focused' : '';
+    return `<button class="part${cls}${isFoc}" data-part="${id}">
       <span class="dot ${st || ''}"></span>
       <span class="pname">${PART_LABEL[id]}</span>
       <span class="note">${note}</span>
@@ -1391,6 +1470,8 @@ const SIDE_NAME = { port: 'Port (Left)', starboard: 'Starboard (Right)' };
 async function openEngine(side) {
   selected = side;
   view = 'engine';
+  focusedPartId = null;
+  updateFocusCallout();
   document.getElementById('card-port').setAttribute('aria-current', String(side === 'port'));
   document.getElementById('card-starboard').setAttribute('aria-current', String(side === 'starboard'));
 
@@ -1419,6 +1500,8 @@ function backToAircraft() {
   if (appMode === 'single') return;
   view = 'aircraft';
   selected = null;
+  focusedPartId = null;
+  updateFocusCallout();
   document.getElementById('card-port').setAttribute('aria-current', 'false');
   document.getElementById('card-starboard').setAttribute('aria-current', 'false');
   clearExploded();
@@ -1495,11 +1578,140 @@ document.querySelectorAll('[data-sim]').forEach(btn => {
   btn.onclick = () => runSim(btn.dataset.sim);
 });
 
+const PART_FOCUS_CONFIG = {
+  injector_1: {
+    target: [-0.345, 0.845, 0.162],
+    camOffset: [0.0, 0.22, 0.28],
+    desc: 'Bosch 1,800 bar Piezo Injector #1'
+  },
+  injector_2: {
+    target: [-0.13, 0.845, 0.161],
+    camOffset: [0.0, 0.22, 0.28],
+    desc: 'Bosch 1,800 bar Piezo Injector #2'
+  },
+  injector_3: {
+    target: [0.085, 0.845, 0.162],
+    camOffset: [0.0, 0.22, 0.28],
+    desc: 'Bosch 1,800 bar Piezo Injector #3'
+  },
+  injector_4: {
+    target: [0.3, 0.845, 0.162],
+    camOffset: [0.0, 0.22, 0.28],
+    desc: 'Bosch 1,800 bar Piezo Injector #4'
+  },
+  common_rail: {
+    target: [-0.112, 0.634, 0.28],
+    camOffset: [-0.08, 0.24, 0.44],
+    desc: '1,800 bar High-Pressure Accumulator Rail'
+  },
+  turbocharger: {
+    target: [0.375, 0.897, 0.074],
+    camOffset: [0.30, 0.20, 0.26],
+    desc: 'Variable-Geometry Turbine (VGT) & Compressor'
+  },
+  intake: {
+    target: [-0.118, 0.752, 0.508],
+    camOffset: [-0.05, 0.22, 0.40],
+    desc: 'Charge Air Intake Manifold & MAP Sensor'
+  },
+  exhaust: {
+    target: [-0.027, 0.79, -0.243],
+    camOffset: [-0.05, 0.24, -0.44],
+    desc: 'Inconel Exhaust Runner Log to Turbine'
+  },
+  cylinder_head: {
+    target: [-0.02, 0.76, 0.128],
+    camOffset: [0.0, 0.38, 0.36],
+    desc: '4-Valve Per Cylinder Crossflow Head'
+  },
+  cooling: {
+    target: [0.283, 0.574, -0.19],
+    camOffset: [0.28, 0.20, -0.30],
+    desc: 'Liquid Cooling Rail, Jacket & Thermostat'
+  },
+  lubrication: {
+    target: [-0.004, 0.379, -0.052],
+    camOffset: [-0.22, 0.18, 0.40],
+    desc: 'Dry-Sump Scavenge & Pressure Pump'
+  },
+  controller: {
+    target: [-0.447, 0.301, 0.354],
+    camOffset: [-0.28, 0.16, 0.18],
+    desc: 'Engine ECU & CAN Sensor Signal Interface'
+  },
+  crankcase: {
+    target: [0.11, 0.31, -0.033],
+    camOffset: [0.32, 0.22, 0.42],
+    desc: 'High-Strength Cast Crankcase & Girdle'
+  },
+  engine_body: {
+    target: [0.139, 0.402, -0.009],
+    camOffset: [0.40, 0.30, 0.60],
+    desc: '2.2L Aero-Diesel Powerplant Core'
+  }
+};
+
+function focusPart(partId) {
+  if (!engine) return;
+  const node = engine.getObjectByName(partId);
+  if (!node) return;
+
+  // Toggle off if clicking the already focused part
+  if (focusedPartId === partId) {
+    focusedPartId = null;
+    updateFocusCallout();
+    const r = live && live.engines && live.engines[selected];
+    const flags = (r && r.parts) || {};
+    for (const id of PART_KEYS) {
+      tintPart(engine, id, flags[id] || null);
+    }
+    frame(engine, 1.25);
+    paintDetail();
+    return;
+  }
+
+  focusedPartId = partId;
+  updateFocusCallout();
+
+  const cfg = PART_FOCUS_CONFIG[partId];
+  let targetCenter, camPos;
+
+  if (cfg) {
+    targetCenter = new THREE.Vector3(...cfg.target);
+    camPos = targetCenter.clone().add(new THREE.Vector3(...cfg.camOffset));
+  } else {
+    const box = new THREE.Box3().setFromObject(node);
+    targetCenter = box.getCenter(new THREE.Vector3());
+    camPos = targetCenter.clone().add(new THREE.Vector3(0.3, 0.25, 0.45));
+  }
+
+  controls.minDistance = 0.15;
+  controls.maxDistance = 4.0;
+  camera.near = 0.02;
+  camera.far = 20.0;
+  camera.updateProjectionMatrix();
+
+  animateCameraTo(camPos, targetCenter, 380);
+
+  // Apply tint so the focused part lights up and stays lit
+  const r = live && live.engines && live.engines[selected];
+  const flags = (r && r.parts) || {};
+  for (const id of PART_KEYS) {
+    tintPart(engine, id, flags[id] || null);
+  }
+
+  // Update button class in UI
+  document.querySelectorAll('#parts .part').forEach(btn => {
+    btn.classList.toggle('focused', btn.dataset.part === partId);
+  });
+
+  needsRender = true;
+}
+
 document.getElementById('parts').addEventListener('click', e => {
   const b = e.target.closest('[data-part]');
   if (!b || !engine) return;
-  const node = engine.getObjectByName(b.dataset.part);
-  if (node) frame(node, 2.6);
+  focusPart(b.dataset.part);
 });
 
 
@@ -1714,84 +1926,26 @@ if (btnFleetTableSingle) btnFleetTableSingle.onclick = showSingleView;
 
 /* ---------- spotlight guide ---------- */
 
-const TOUR_KEY = 'shadowtwin_tour_seen_v6';
+const TOUR_KEY = 'shadowtwin_tour_seen_v8';
 
-/* ---- Aircraft-view steps ---- */
+/* ---- Aircraft-view steps (5 steps total, zero duplication) ---- */
 const AIRCRAFT_STEPS = [
   {
     targetId: null,
     place: 'center',
-    eyebrow: 'AeroTwin \u2014 Quick Guide',
+    eyebrow: 'AeroTwin \u2014 Guided Walkthrough',
     title: 'Digital Twin for Twin-Engine MALE UAVs',
-    body: 'This system runs a real-time physics model side-by-side with incoming CAN telemetry, ' +
-          'detecting propulsion anomalies and predicting remaining useful life before faults become critical. ' +
-          'Let\u2019s walk through the key features.',
+    body: 'Welcome to AeroTwin (DRDO SIH 26054). This system runs a real-time physics model side-by-side with incoming CAN bus telemetry to detect propulsion anomalies, isolate sensor faults, and predict remaining useful life before faults become critical.',
     showDontShow: false,
     type: 'normal',
     view: 'twin'
   },
   {
     targetId: 'viewport',
-    place: 'right',
-    eyebrow: 'Aircraft Step 1 of 9 \u2014 3D Airframe',
+    place: 'stage-card',
+    eyebrow: 'Aircraft Step 1 of 4 \u2014 3D Airframe',
     title: 'TAPAS-BH-201 3D Airframe',
-    body: '<strong>Drag</strong> to orbit, <strong>scroll</strong> to zoom. ' +
-          'The twin wing-mounted nacelles house the 2.2\u202fL turbo-diesel aero powerplants.',
-    showDontShow: false,
-    type: 'normal',
-    view: 'twin'
-  },
-  {
-    targetId: 'mission-banner',
-    place: 'left',
-    eyebrow: 'Aircraft Step 2 of 9 \u2014 Go / No-Go Banner',
-    title: 'Mission readiness at a glance',
-    body: 'Combines health across both engines into a single operational call: ' +
-          '<strong>GO</strong>, <strong>CAUTION</strong>, or <strong>NO-GO</strong>. ' +
-          'If it says GO, the aircraft is safe to fly. CAUTION warns of emerging drift, and NO-GO marks critical degradation.',
-    showDontShow: false,
-    type: 'normal',
-    view: 'twin'
-  },
-  {
-    targetId: 'sec-engines',
-    place: 'left',
-    eyebrow: 'Aircraft Step 3 of 9 \u2014 Engine Status',
-    title: 'Port & Starboard engines',
-    body: 'Each card shows live status (<strong>Nominal / Caution / Fault</strong>), ' +
-          'health sparkline trend, and remaining useful life. You can monitor whether one or both engines are degrading.',
-    showDontShow: false,
-    type: 'normal',
-    view: 'twin'
-  },
-  {
-    targetId: 'sec-margin',
-    place: 'left',
-    eyebrow: 'Aircraft Step 4 of 9 \u2014 Mission Margin',
-    title: 'Sortie endurance margins',
-    body: '<strong>Hours pair margin</strong> shows how many flight hours both engines together can sustain before hitting limits. ' +
-          '<strong>Engine-out margin</strong> shows endurance if one engine failed.',
-    showDontShow: false,
-    type: 'normal',
-    view: 'twin'
-  },
-  {
-    targetId: 'sec-simulate',
-    place: 'left',
-    eyebrow: 'Aircraft Step 5 of 9 \u2014 Simulate',
-    title: 'Live fault injection',
-    body: 'Test how the twin responds. Inject an <strong>Injector fault</strong>, <strong>Sensor fault</strong>, or ' +
-          '<strong>Both engines drift</strong> to see live detection and mission margins update. <strong>Clear</strong> resets to nominal.',
-    showDontShow: false,
-    type: 'normal',
-    view: 'twin'
-  },
-  {
-    targetId: 'btn-view-single',
-    place: 'below',
-    eyebrow: 'Aircraft Step 6 of 9 \u2014 Single-Engine UAV',
-    title: 'Single-Engine Tactical UAV',
-    body: 'Switch to a standalone single-engine tactical UAV (Rustom-1 / Archer class) to inspect the 2.2L aero-diesel powerplant directly without requiring the aircraft airframe.',
+    body: '<strong>Drag</strong> to orbit, <strong>scroll</strong> to zoom. The twin wing-mounted nacelles house the 2.2\u202fL turbo-diesel aero powerplants. Each engine operates an independent CAN ECU with cross-engine AI correlation.',
     showDontShow: false,
     type: 'normal',
     view: 'twin'
@@ -1799,30 +1953,29 @@ const AIRCRAFT_STEPS = [
   {
     targetId: 'btn-view-fleet',
     place: 'below',
-    eyebrow: 'Aircraft Step 7 of 9 \u2014 Fleet Navigation',
-    title: 'Multi-UAV fleet switching',
-    body: 'Use this top switcher to toggle between the <strong>Twin-Engine TAPAS-01</strong>, <strong>Single-Engine RUSTOM-01</strong>, and the <strong>Squadron Fleet Command</strong> dashboard.',
+    eyebrow: 'Aircraft Step 2 of 4 \u2014 Multi-UAV Switching',
+    title: 'Twin, Single & Squadron Fleet Command',
+    body: 'Use this top switcher to toggle between <strong>TAPAS-01 Twin-Engine UAV</strong>, <strong>RUSTOM-01 Single-Engine Tactical UAV</strong>, and the <strong>Squadron Fleet Command</strong> monitoring 4 airframes simultaneously.',
     showDontShow: false,
     type: 'normal',
     view: 'twin'
   },
   {
-    targetId: 'fleet-card-1',
-    place: 'right',
-    eyebrow: 'Aircraft Step 8 of 9 \u2014 Squadron Fleet Command',
-    title: 'Monitor 4 UAVs in a single dashboard',
-    body: 'The twin scales across the entire squadron. Here you can monitor all 4 MALE and tactical UAVs simultaneously \u2014 tracking propulsion health, operational readiness (GO / CAUTION / NO-GO), and sortie margins in real time. TAPAS-03 is flagged for Starboard EGT drift.',
+    targetId: 'mission-banner',
+    place: 'left',
+    eyebrow: 'Aircraft Step 3 of 4 \u2014 Operational Readiness',
+    title: 'Mission Go / Caution / No-Go & Margins',
+    body: 'The <strong>GO / CAUTION / NO-GO</strong> banner combines propulsion health across both engines into a single operational call. Below it, <strong>Hours pair margin</strong> and <strong>Engine-out margin</strong> update in real time.',
     showDontShow: false,
     type: 'normal',
-    view: 'fleet'
+    view: 'twin'
   },
   {
     targetId: 'viewport',
-    place: 'right',
-    eyebrow: 'Aircraft Step 9 of 9 \u2014 Engine Inspection',
+    place: 'stage-card',
+    eyebrow: 'Aircraft Step 4 of 4 \u2014 Deep Engine Inspection',
     title: 'Click an engine nacelle to fly inside',
-    body: 'Back on lead aircraft TAPAS-01: the pulsing rings mark the engine nacelles. <strong>Click either engine nacelle</strong> ' +
-          '(or click an engine card on the right) to fly inside and inspect the engine internals!',
+    body: 'Pulsing rings highlight the twin nacelles. <strong>Click either engine nacelle</strong> (or click Port in the sidebar) to fly inside the 3D powerplant and inspect internal component diagnostics!',
     showDontShow: false,
     type: 'click-engine',
     view: 'twin'
@@ -1842,21 +1995,21 @@ const SINGLE_STEPS = [
     view: 'single'
   },
   {
-    targetId: 'card-port',
+    targetId: 'entry-architecture',
     place: 'left',
-    eyebrow: 'Single-Engine Step 1 of 4 \u2014 Propulsion Health',
-    title: 'Primary engine status',
-    body: 'Real-time propulsion health index, RUL projection strip, and confidence metrics for the single powerplant.',
+    eyebrow: 'Single-Engine Step 1 of 4 \u2014 Tactical Architecture',
+    title: 'Critical Single Point of Failure (SPOF)',
+    body: 'Unlike twin-engine UAVs, single-engine tactical UAVs have <strong>zero engine-out redundancy</strong>. Any critical anomaly triggers an immediate abort protocol (forced glide or parachute recovery).',
     showDontShow: false,
     type: 'normal',
     view: 'single'
   },
   {
-    targetId: 'panel-readings',
+    targetId: 'stage-infobar',
     place: 'right',
     eyebrow: 'Single-Engine Step 2 of 4 \u2014 Telemetry vs Physics',
-    title: 'Mean Value Engine Model',
-    body: 'Compares real-time sensor measurements against expected physics at the current operating point to detect early drift.',
+    title: 'Simplex CAN Bus Ingestion',
+    body: 'Sensor channels are ingested over a simplex CAN bus link (ECU-1 Node) and continuously compared against the Mean Value Engine Model.',
     showDontShow: false,
     type: 'normal',
     view: 'single'
@@ -1864,9 +2017,9 @@ const SINGLE_STEPS = [
   {
     targetId: 'sec-parts',
     place: 'left',
-    eyebrow: 'Single-Engine Step 3 of 4 \u2014 Internal Diagnostics',
-    title: 'Flagged components',
-    body: 'When degradation occurs, affected components highlight in brick-red or amber and pop out in 3D exploded view with diagnostic callouts.',
+    eyebrow: 'Single-Engine Step 3 of 4 \u2014 Component Diagnostics',
+    title: 'Interactive 3D Component Focus',
+    body: 'Click any component in this list (Turbocharger, Common Rail, Injectors, Controller) to smoothly pivot the 3D camera and highlight that part with 3D pin callouts.',
     showDontShow: false,
     type: 'normal',
     view: 'single'
@@ -1874,118 +2027,59 @@ const SINGLE_STEPS = [
   {
     targetId: 'btn-view-twin',
     place: 'below',
-    eyebrow: 'Single-Engine Step 4 of 4 \u2014 Switch to Twin Airframe',
+    eyebrow: 'Single-Engine Step 4 of 4 \u2014 Platform Switch',
     title: 'Switch between UAV classes',
-    body: 'Click <strong>TAPAS-01 Twin-Engine UAV</strong> at any time to switch to the twin wing-mounted airframe.',
+    body: 'Click <strong>TAPAS-01 Twin-Engine UAV</strong> at any time to return to the twin wing-mounted airframe.',
     showDontShow: true,
     type: 'normal',
     view: 'single'
   }
 ];
 
-/* ---- Engine-view steps (shown after openEngine() during tour) ---- */
+/* ---- Engine-view steps (shown after openEngine() during tour — NO REPEATS) ---- */
 const ENGINE_STEPS = [
   {
-    targetId: null,
-    place: 'center',
-    eyebrow: 'Engine view',
-    title: 'You\u2019re inside the engine',
-    body: 'The 3D model now shows the engine internals. Flagged components are tinted ' +
-          '\u2014 red for fault, amber for caution. Eight steps walk through every panel on the right.',
+    targetId: 'viewport',
+    place: 'stage-card',
+    eyebrow: 'Engine Step 1 of 5 \u2014 3D Internals',
+    title: 'Inside the 2.2L Aero-Diesel Powerplant',
+    body: 'You are now inside the 3D engine model. Flagged components highlight in <strong>brick-red for fault</strong> or <strong>amber for caution</strong>, and automatically pop out in 3D exploded view with diagnostic callouts.',
     showDontShow: false,
     type: 'normal'
   },
   {
-    targetId: 'mission-banner',
-    place: 'left',
-    eyebrow: 'Engine step 1 of 8 \u2014 Go / No-Go',
-    title: 'Mission status at a glance',
-    body: 'This banner gives the single most important answer: <strong>GO</strong>, ' +
-          '<strong>CAUTION</strong>, or <strong>NO-GO</strong>. It combines the health ' +
-          'of both engines and the remaining mission margin into one call. ' +
-          'If it says GO, the aircraft is safe to continue. CAUTION means watch closely. ' +
-          'NO-GO means at least one engine has reached a fault threshold.',
-    showDontShow: false,
-    type: 'normal'
-  },
-  {
-    targetId: 'sec-engines',
-    place: 'left',
-    eyebrow: 'Engine step 2 of 8 \u2014 Engine cards',
-    title: 'Port & Starboard engine status',
-    body: 'Each card shows the per-engine health state, remaining-useful-life strip, ' +
-          'and a confidence pill. <strong>Nominal</strong> means the twin sees no drift. ' +
-          '<strong>Caution</strong> means a trend is forming. <strong>Fault</strong> means ' +
-          'a classified fault has been detected above the confidence threshold.',
-    showDontShow: false,
-    type: 'normal'
-  },
-  {
-    targetId: 'panel-findings',
+    targetId: 'stage-infobar',
     place: 'right',
-    eyebrow: 'Engine step 3 of 8 \u2014 Findings',
-    title: 'What\u2019s wrong and why',
-    body: '<strong>Findings</strong> names the fault in plain language, which component ' +
-          'is affected, and the confidence level. Sensor faults are listed separately ' +
-          'so they are never confused with engine problems.',
+    eyebrow: 'Engine Step 2 of 5 \u2014 Telemetry vs Physics',
+    title: 'Mean Value Engine Model (MVEM)',
+    body: 'Every sensor channel displays its <strong>measured telemetry</strong> alongside what the healthy physics model expected at this operating point. The residual delta separates engine degradation from flight condition changes.',
     showDontShow: false,
     type: 'normal'
   },
   {
-    targetId: 'panel-readings',
+    targetId: 'stage-infobar',
     place: 'right',
-    eyebrow: 'Engine step 4 of 8 \u2014 Readings',
-    title: 'Sensor vs physics model',
-    body: 'Every sensor channel shows its <strong>measured value</strong> alongside what ' +
-          'the physics model expected. The delta tells you exactly how far the engine has ' +
-          'drifted from healthy behaviour at the current operating point.',
+    eyebrow: 'Engine Step 3 of 5 \u2014 AI Root Cause Isolation',
+    title: 'Findings & Sensor Trust Gateway',
+    body: 'The AI isolation forest and robust classifier name the fault in plain language with confidence percentages. The Sensor Trust Gateway strictly isolates faulty sensors so sensor issues are never confused with engine faults.',
     showDontShow: false,
     type: 'normal'
   },
   {
     targetId: 'sec-parts',
     place: 'left',
-    eyebrow: 'Engine step 5 of 8 \u2014 Components',
-    title: 'Flagged components',
-    body: 'Click any component here to zoom the 3D view onto it. <strong>Fault</strong> ' +
-          'parts highlight in brick-red; <strong>Caution</strong> parts in amber. ' +
-          'When the engine is healthy all components stay neutral grey.',
-    showDontShow: false,
-    type: 'normal'
-  },
-  {
-    targetId: 'sec-margin',
-    place: 'left',
-    eyebrow: 'Engine step 6 of 8 \u2014 Mission margin',
-    title: 'How long can the aircraft keep flying?',
-    body: '<strong>Hours pair margin</strong> \u2014 how many flight hours both engines ' +
-          'together can sustain before hitting a degradation limit. ' +
-          '<strong>Engine-out margin</strong> \u2014 the same calculation assuming one ' +
-          'engine is already lost. Both update live as the twin runs.',
-    showDontShow: false,
-    type: 'normal'
-  },
-  {
-    targetId: 'sec-extra-wrap',
-    place: 'left',
-    eyebrow: 'Engine step 7 of 8 \u2014 Projection',
-    title: 'Remaining useful life & trend',
-    body: '<strong>Projection</strong> shows the remaining-useful-life estimate with a ' +
-          'P10\u2013P90 confidence band, driven by the degradation rate the twin is ' +
-          'currently tracking. This is a model-based indicator, not a field-validated ' +
-          'number. Treat it as a relative trend, not a hard maintenance limit.',
+    eyebrow: 'Engine Step 4 of 5 \u2014 Component Diagnostics',
+    title: 'Interactive 3D Component Focus',
+    body: 'Click any component in this list \u2014 <strong>Turbocharger</strong>, <strong>Common Rail</strong>, <strong>Injectors</strong>, <strong>Exhaust</strong>, or <strong>Controller</strong> \u2014 to automatically pivot and zoom the 3D camera right onto that part with dedicated 3D pin callouts!',
     showDontShow: false,
     type: 'normal'
   },
   {
     targetId: 'sec-simulate',
     place: 'left',
-    eyebrow: 'Engine step 8 of 8 \u2014 Simulate',
-    title: 'Inject a fault to try it out',
-    body: 'Pick <strong>Injector fault</strong>, <strong>Sensor fault</strong>, or ' +
-          '<strong>Both engines drift</strong> and watch detection, findings and mission ' +
-          'margin update within a few seconds. <strong>Clear</strong> resets everything ' +
-          'back to nominal.',
+    eyebrow: 'Engine Step 5 of 5 \u2014 Fault Injection',
+    title: 'Simulate degradation & stress test',
+    body: 'Click <strong>Injector fault</strong>, <strong>Sensor fault</strong>, or <strong>Both engines drift</strong> to see 3D components pop out and detection react in seconds. <strong>Clear</strong> smoothly restores nominal operation.',
     showDontShow: true,
     type: 'normal'
   }
@@ -2152,11 +2246,8 @@ function positionTour() {
   /* nacelle pulse */
   if (clickEngine) { showNacelleOverlay(); } else { hideNacelleOverlay(); }
 
-  /* placement arrow */
-  tourTooltip.className = 'tour-tooltip place-' + step.place;
-
+  // 1. Center card (no target)
   if (!step.targetId) {
-    /* full-dim, centered tooltip */
     tourScrim.style.position      = 'fixed';
     tourScrim.style.top           = '0';
     tourScrim.style.left          = '0';
@@ -2166,9 +2257,28 @@ function positionTour() {
     tourScrim.style.boxShadow     = 'none';
     tourScrim.style.background    = 'rgba(42,46,51,0.50)';
     tourScrim.style.pointerEvents = 'auto';
+    tourTooltip.className         = 'tour-tooltip place-center';
     tourTooltip.style.top         = '50%';
     tourTooltip.style.left        = '50%';
     tourTooltip.style.transform   = 'translate(-50%,-50%)';
+    return;
+  }
+
+  // 2. In-stage floating card for 3D viewport
+  if (step.place === 'stage-card' || step.targetId === 'viewport') {
+    tourScrim.style.position      = 'fixed';
+    tourScrim.style.top           = '0';
+    tourScrim.style.left          = '0';
+    tourScrim.style.width         = '100vw';
+    tourScrim.style.height        = '100vh';
+    tourScrim.style.borderRadius  = '0';
+    tourScrim.style.boxShadow     = 'none';
+    tourScrim.style.background    = 'rgba(42,46,51,0.22)';
+    tourScrim.style.pointerEvents = 'none';
+    tourTooltip.className         = 'tour-tooltip place-stage-card';
+    tourTooltip.style.transform   = '';
+    tourTooltip.style.top         = '110px';
+    tourTooltip.style.left        = '28px';
     return;
   }
 
@@ -2176,16 +2286,16 @@ function positionTour() {
   tourScrim.style.transform  = '';
 
   /* Activate required tab if highlighting findings or readings */
-  if (step.targetId === 'panel-readings') {
+  if (step.targetId === 'panel-readings' || (step.targetId === 'stage-infobar' && step.title.includes('Mean Value')) || (step.targetId === 'stage-infobar' && step.title.includes('CAN Bus'))) {
     setInfoTab('readings');
-  } else if (step.targetId === 'panel-findings') {
+  } else if (step.targetId === 'panel-findings' || (step.targetId === 'stage-infobar' && step.title.includes('Findings'))) {
     setInfoTab('findings');
   }
 
   const target = document.getElementById(step.targetId);
   if (!target) return;
 
-  /* Ensure target is visible before scrolling and measuring */
+  /* Ensure target is visible */
   if (step.targetId === 'sec-extra-wrap') {
     target.classList.remove('hidden');
     const extraEl = document.getElementById('sec-extra');
@@ -2198,15 +2308,21 @@ function positionTour() {
     target.classList.remove('hidden');
   }
 
-  /* Scroll target into view with centering so it's fully visible in sidebar or container */
-  if (step.targetId !== 'btn-view-fleet' && step.targetId !== 'btn-view-twin' && step.targetId !== 'btn-view-single') {
-    target.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
+  /* Internal scrolling ONLY inside scroll containers (NEVER window) */
+  const sideEl = document.querySelector('.side');
+  if (sideEl && sideEl.contains(target)) {
+    const sideRect = sideEl.getBoundingClientRect();
+    const elemRect = target.getBoundingClientRect();
+    if (elemRect.top < sideRect.top + 20 || elemRect.bottom > sideRect.bottom - 20) {
+      const scrollOffset = (elemRect.top + elemRect.height / 2) - (sideRect.top + sideRect.height / 2);
+      sideEl.scrollBy({ top: scrollOffset, behavior: 'auto' });
+    }
   }
 
-  const r   = target.getBoundingClientRect();
-  const vw  = window.innerWidth;
-  const vh  = window.innerHeight;
-  const tipW = tourTooltip.offsetWidth || 300;
+  const r    = target.getBoundingClientRect();
+  const vw   = window.innerWidth;
+  const vh   = window.innerHeight;
+  const tipW = tourTooltip.offsetWidth || 320;
   const tipH = tourTooltip.offsetHeight || 220;
 
   const sx = Math.max(0, r.left - PAD);
@@ -2223,21 +2339,36 @@ function positionTour() {
   tourScrim.style.boxShadow     = '0 0 0 9999px rgba(42,46,51,0.55)';
   tourScrim.style.pointerEvents = 'none';
 
-  const GAP = 16;
-  let tx, ty;
+  tourTooltip.className = 'tour-tooltip place-' + step.place;
+
+  const GAP = 14;
+  let tx, ty, arrowPos;
+  const targetCenterY = r.top + r.height / 2;
+  const targetCenterX = r.left + r.width / 2;
+
   if (step.place === 'left') {
     tx = Math.max(12, sx - tipW - GAP);
-    ty = Math.min(vh - tipH - 12, Math.max(12, sy));
+    ty = Math.max(54, Math.min(vh - tipH - 16, targetCenterY - tipH / 2));
+    arrowPos = Math.max(16, Math.min(tipH - 16, targetCenterY - ty));
+    tourTooltip.style.setProperty('--arrow-pos', arrowPos + 'px');
   } else if (step.place === 'right') {
     tx = Math.min(vw - tipW - 12, sx + sw + GAP);
-    ty = Math.min(vh - tipH - 12, Math.max(12, sy));
+    ty = Math.max(54, Math.min(vh - tipH - 16, targetCenterY - tipH / 2));
+    arrowPos = Math.max(16, Math.min(tipH - 16, targetCenterY - ty));
+    tourTooltip.style.setProperty('--arrow-pos', arrowPos + 'px');
   } else if (step.place === 'below') {
-    tx = Math.min(vw - tipW - 12, Math.max(12, sx));
-    ty = Math.min(vh - tipH - 12, sy + sh + GAP);
+    tx = Math.max(12, Math.min(vw - tipW - 12, targetCenterX - tipW / 2));
+    ty = Math.min(vh - tipH - 16, sy + sh + GAP);
+    arrowPos = Math.max(16, Math.min(tipW - 16, targetCenterX - tx));
+    tourTooltip.style.setProperty('--arrow-pos', arrowPos + 'px');
   } else {
-    tx = Math.min(vw - tipW - 12, Math.max(12, sx));
-    ty = Math.max(12, sy - tipH - GAP);
+    // 'above'
+    tx = Math.max(12, Math.min(vw - tipW - 12, targetCenterX - tipW / 2));
+    ty = Math.max(54, sy - tipH - GAP);
+    arrowPos = Math.max(16, Math.min(tipW - 16, targetCenterX - tx));
+    tourTooltip.style.setProperty('--arrow-pos', arrowPos + 'px');
   }
+
   tourTooltip.style.transform = '';
   tourTooltip.style.left = tx + 'px';
   tourTooltip.style.top  = ty + 'px';
@@ -2342,7 +2473,7 @@ if (nacelleOverlay) {
 }
 
 /* Clear older tour keys so test users get the new tour on enter */
-['shadowtwin_tour_seen', 'shadowtwin_tour_seen_v2', 'shadowtwin_tour_seen_v3', 'shadowtwin_tour_seen_v4', 'shadowtwin_tour_seen_v5'].forEach(k => {
+['shadowtwin_tour_seen', 'shadowtwin_tour_seen_v2', 'shadowtwin_tour_seen_v3', 'shadowtwin_tour_seen_v4', 'shadowtwin_tour_seen_v5', 'shadowtwin_tour_seen_v6', 'shadowtwin_tour_seen_v7'].forEach(k => {
   try { localStorage.removeItem(k); } catch (e) { /* private */ }
 });
 

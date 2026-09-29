@@ -234,6 +234,11 @@ button:disabled:hover { background: transparent; }
 .part .pname { flex: 1; }
 .part.flagged .pname { color: var(--fault); }
 .part.watch .pname { color: var(--caution); }
+.part.focused {
+  background: #EAE6DE;
+  box-shadow: inset 0 0 0 1.5px var(--ink);
+  font-weight: 600;
+}
 
 .empty { font-size: 13px; color: var(--ink-soft); }
 
@@ -285,6 +290,16 @@ button:disabled:hover { background: transparent; }
 .callout.shown { opacity: 1; }
 .callout.fault { border-left-color: var(--fault); }
 .callout.caution { border-left-color: var(--caution); }
+.callout.focused {
+  border-left-color: var(--ink);
+  box-shadow: 0 4px 16px rgba(42, 46, 51, 0.15), 0 0 0 1px var(--ink);
+  font-weight: 500;
+  z-index: 15;
+}
+.callout.focused .cname {
+  color: var(--ink);
+  font-weight: 600;
+}
 .callout .cname { font-size: 13px; font-weight: 500; }
 .callout .cnote { font-size: 12px; color: var(--ink-soft); }
 
@@ -365,12 +380,13 @@ button:disabled:hover { background: transparent; }
 .tour-tooltip {
   position: fixed;
   z-index: 201;
-  width: 300px;
+  width: 320px;
+  max-width: calc(100vw - 32px);
   background: var(--panel);
   border-radius: var(--radius);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.20), 0 0 0 1px var(--line);
-  padding: 20px 20px 16px;
-  transition: top 260ms var(--ease), left 260ms var(--ease), opacity 180ms;
+  box-shadow: 0 12px 36px rgba(0,0,0,0.22), 0 0 0 1px var(--line);
+  padding: 18px 20px 16px;
+  transition: opacity 180ms ease;
 }
 .tour-tooltip.hidden { display: none; }
 
@@ -384,28 +400,29 @@ button:disabled:hover { background: transparent; }
   box-shadow: -1px -1px 0 var(--line);
   border-radius: 1px;
 }
-/* Placement classes set arrow position; JS adds the right one */
+/* Placement classes set arrow position; JS sets --arrow-pos */
 .tour-tooltip.place-left::before {
   right: -6px;
-  top: 20px;
+  top: var(--arrow-pos, 24px);
   transform: rotate(135deg);
 }
 .tour-tooltip.place-right::before {
   left: -6px;
-  top: 20px;
+  top: var(--arrow-pos, 24px);
   transform: rotate(-45deg);
 }
 .tour-tooltip.place-below::before {
   top: -6px;
-  left: 20px;
+  left: var(--arrow-pos, 24px);
   transform: rotate(45deg);
 }
 .tour-tooltip.place-above::before {
   bottom: -6px;
-  left: 20px;
+  left: var(--arrow-pos, 24px);
   transform: rotate(-135deg);
 }
-.tour-tooltip.place-center::before { display: none; }
+.tour-tooltip.place-center::before,
+.tour-tooltip.place-stage-card::before { display: none; }
 
 .tour-eyebrow {
   font-size: 11px;
