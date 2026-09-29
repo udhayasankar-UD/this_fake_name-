@@ -2421,24 +2421,6 @@ function positionTour() {
     return;
   }
 
-  // 2. In-stage floating card for 3D viewport
-  if (step.place === 'stage-card' || step.targetId === 'viewport') {
-    tourScrim.style.position      = 'fixed';
-    tourScrim.style.top           = '0';
-    tourScrim.style.left          = '0';
-    tourScrim.style.width         = '100vw';
-    tourScrim.style.height        = '100vh';
-    tourScrim.style.borderRadius  = '0';
-    tourScrim.style.boxShadow     = 'none';
-    tourScrim.style.background    = 'rgba(42,46,51,0.22)';
-    tourScrim.style.pointerEvents = 'none';
-    tourTooltip.className         = 'tour-tooltip place-stage-card';
-    tourTooltip.style.transform   = '';
-    tourTooltip.style.top         = '110px';
-    tourTooltip.style.left        = '28px';
-    return;
-  }
-
   tourScrim.style.background = '';
   tourScrim.style.transform  = '';
 
@@ -2512,7 +2494,11 @@ function positionTour() {
   const targetCenterY = r.top + r.height / 2;
   const targetCenterX = r.left + r.width / 2;
 
-  if (step.place === 'left') {
+  if (step.place === 'stage-card') {
+    tx = r.left + 28;
+    ty = r.top + 110;
+    tourTooltip.style.setProperty('--arrow-pos', '0px');
+  } else if (step.place === 'left') {
     tx = Math.max(12, sx - tipW - GAP);
     ty = Math.max(54, Math.min(vh - tipH - 16, targetCenterY - tipH / 2));
     arrowPos = Math.max(16, Math.min(tipH - 16, targetCenterY - ty));
