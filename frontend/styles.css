@@ -689,6 +689,13 @@ button:disabled:hover { background: transparent; }
 /* ---- simulate button grid ---- */
 .sim-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .sim-clear { grid-column: 1 / -1; }
+.sim-grid button.active {
+  background: var(--ink-soft);
+  color: #FFFFFF;
+  border-color: var(--ink);
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(42, 46, 51, 0.25);
+}
 
 /* ---- floating info bar (Findings / Readings) — bottom-left HUD panel ---- */
 .stage-infobar {

@@ -3,18 +3,18 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>shadow-twin</title>
+<title>Shadow Twin — Digital Twin for UAV Powerplants</title>
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 <header class="top-nav">
   <div class="top-nav-brand">
     <span class="top-nav-badge">DRDO SIH 26054</span>
-    <strong class="top-nav-title">AeroTwin</strong>
+    <strong class="top-nav-title">Shadow Twin</strong>
     <span class="top-nav-sep">/</span>
     <span class="top-nav-platform" id="top-nav-platform">TAPAS-BH-201 MALE UAV (Twin-Engine)</span>
   </div>
-  <div class="top-nav-switcher" role="tablist">
+  <div class="top-nav-switcher" id="top-nav-switcher" role="tablist">
     <button class="top-nav-tab active" id="btn-view-twin" role="tab" aria-selected="true">
       <span class="nav-pulse"></span>
       TAPAS-01 Twin-Engine UAV
@@ -438,11 +438,16 @@
 
 <!-- spotlight tour: scrim + tooltip, positioned by JS -->
 <div class="tour-scrim hidden" id="tour-overlay" role="dialog" aria-modal="true" aria-labelledby="tour-tip-title"></div>
-<!-- nacelle pulse ring: shown during click-engine step -->
-<div class="tour-nacelle-pulse hidden" id="tour-nacelle-pulse">
+<!-- nacelle pulse rings: shown during click-engine step -->
+<div class="tour-nacelle-pulse hidden" id="tour-nacelle-pulse-port">
   <span class="nacelle-ring"></span>
   <span class="nacelle-ring nacelle-ring--delay"></span>
-  <span class="nacelle-label">Click engine</span>
+  <span class="nacelle-label">Port Engine (Left)</span>
+</div>
+<div class="tour-nacelle-pulse hidden" id="tour-nacelle-pulse-stbd">
+  <span class="nacelle-ring"></span>
+  <span class="nacelle-ring nacelle-ring--delay"></span>
+  <span class="nacelle-label">Starboard Engine (Right)</span>
 </div>
 <div class="tour-tooltip hidden" id="tour-tooltip">
   <p class="tour-eyebrow" id="tour-eyebrow"></p>

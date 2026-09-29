@@ -190,6 +190,7 @@ function setLoading(text) {
 
 loader.load('models/tapas.glb', gltf => {
   aircraft = gltf.scene;
+  nacelleCenters = null;
   aircraft.traverse(o => { if (o.isMesh) baseMaterial(o); });
   scene.add(aircraft);
   frame(aircraft, 1.15);
@@ -467,7 +468,20 @@ function demoTick() {
   if (connected || !demo || !demoData) return;
   const sc = demoData.scenarios[demo.name];
   if (!sc) return;
-  live = Object.assign({}, sc.frames[demo.idx], { ts: Date.now() / 1000 });
+  const frame = sc.frames[demo.idx];
+  if (appMode === 'single' && demo.name === 'sensor') {
+    const stbdCopy = JSON.parse(JSON.stringify((frame && frame.engines && frame.engines.starboard) || {}));
+    stbdCopy.side = 'port';
+    live = Object.assign({}, frame, {
+      ts: Date.now() / 1000,
+      engines: {
+        port: stbdCopy,
+        starboard: frame && frame.engines && frame.engines.starboard
+      }
+    });
+  } else {
+    live = Object.assign({}, frame, { ts: Date.now() / 1000 });
+  }
   demo.idx += 1;
   if (demo.idx >= sc.frames.length) demo.idx = sc.loop_from || 0;
   filterClearingTelemetry();
@@ -488,6 +502,10 @@ function handOverToLive() {
 /* One place for the Simulate buttons: live backend when connected, else the recording. */
 async function runSim(kind) {
   lastSim = kind;
+  document.querySelectorAll('.sim-grid button').forEach(b => {
+    b.classList.toggle('active', b.dataset.sim === kind && kind !== 'clear');
+  });
+
   if (kind === 'clear') {
     isClearing = true;
     clearStartTime = performance.now();
@@ -517,6 +535,14 @@ async function runSim(kind) {
   nominalStreak = 0;
   if (!connected) {
     if (demo && demoData && demoData.scenarios[kind]) demo = { name: kind, idx: 0 };
+    if (appMode !== 'single') {
+      if (kind === 'sensor' && view === 'engine' && selected !== 'starboard') {
+        openEngine('starboard');
+      } else if (kind === 'injector' && view === 'engine' && selected !== 'port') {
+        openEngine('port');
+      }
+    }
+    demoTick();
     return;
   }
 
@@ -525,8 +551,18 @@ async function runSim(kind) {
     if (kind === 'sensor') { await inject('both', null); await inject('port', 'sensor_stuck'); return; }
     if (kind === 'systemic') { await inject('both', null); await inject('port', 'turbo_underperformance', 0.75); return; }
   } else {
-    if (kind === 'injector') { await inject('both', null); await inject('port', 'injector_underflow', 0.8); return; }
-    if (kind === 'sensor') { await inject('both', null); await inject('starboard', 'sensor_stuck'); return; }
+    if (kind === 'injector') {
+      if (view === 'engine' && selected !== 'port') openEngine('port');
+      await inject('both', null);
+      await inject('port', 'injector_underflow', 0.8);
+      return;
+    }
+    if (kind === 'sensor') {
+      if (view === 'engine' && selected !== 'starboard') openEngine('starboard');
+      await inject('both', null);
+      await inject('starboard', 'sensor_stuck');
+      return;
+    }
     if (kind === 'systemic') { await inject('both', 'turbo_underperformance', 0.75); return; }
   }
 }
@@ -770,6 +806,23 @@ let nacelleTagPort = null;
 let nacelleTagStbd = null;
 let nacelleLabelsVisible = true;
 let nacelleRotTimeout = null;
+let nacelleCenters = null;
+
+function getNacelleCenters() {
+  if (nacelleCenters) return nacelleCenters;
+  if (!aircraft) return null;
+  const pObj = aircraft.getObjectByName('engine_port');
+  const sObj = aircraft.getObjectByName('engine_starboard');
+  if (!pObj || !sObj) return null;
+  const pBox = new THREE.Box3().setFromObject(pObj);
+  const sBox = new THREE.Box3().setFromObject(sObj);
+  const pVec = new THREE.Vector3();
+  const sVec = new THREE.Vector3();
+  pBox.getCenter(pVec);
+  sBox.getCenter(sVec);
+  nacelleCenters = { port: pVec, starboard: sVec };
+  return nacelleCenters;
+}
 
 function createNacelleLabels() {
   if (nacelleTagPort) return;
@@ -811,17 +864,18 @@ function positionNacelleLabels() {
 
   if (!nacelleLabelsVisible) return;
 
+  const centers = getNacelleCenters();
+  if (!centers) return;
+
   /* Position labels from 3D projection of nacelle nodes */
   const w = canvas.clientWidth, h = canvas.clientHeight;
   const sides = [
-    { node: 'engine_port', el: nacelleTagPort },
-    { node: 'engine_starboard', el: nacelleTagStbd }
+    { center: centers.port, el: nacelleTagPort },
+    { center: centers.starboard, el: nacelleTagStbd }
   ];
   for (const s of sides) {
-    const obj = aircraft.getObjectByName(s.node);
-    if (!obj || !s.el) continue;
-    const vec = new THREE.Vector3();
-    obj.getWorldPosition(vec);
+    if (!s.el) continue;
+    const vec = s.center.clone();
     vec.project(camera);
     const x = (vec.x * 0.5 + 0.5) * w;
     const y = (-vec.y * 0.5 + 0.5) * h;
@@ -2006,16 +2060,16 @@ if (btnFleetTableSingle) btnFleetTableSingle.onclick = showSingleView;
 
 /* ---------- spotlight guide ---------- */
 
-const TOUR_KEY = 'shadowtwin_tour_seen_v9';
+const TOUR_KEY = 'shadowtwin_tour_seen_v10';
 
 /* ---- Aircraft-view steps (Twin-engine MALE airframe) ---- */
 const AIRCRAFT_STEPS = [
   {
     targetId: null,
     place: 'center',
-    eyebrow: 'AeroTwin — Guided Walkthrough',
+    eyebrow: 'Shadow Twin — Guided Walkthrough',
     title: 'Digital Twin for Twin-Engine MALE UAVs',
-    body: 'Welcome to AeroTwin (DRDO SIH 26054). This system runs a real-time physics model side-by-side with incoming CAN bus telemetry to detect propulsion anomalies, isolate sensor faults, and predict remaining useful life before faults become critical.',
+    body: 'Welcome to Shadow Twin (DRDO SIH 26054). This system runs a real-time physics model side-by-side with incoming CAN bus telemetry to detect propulsion anomalies, isolate sensor faults, and predict remaining useful life before faults become critical.',
     showDontShow: false,
     type: 'normal',
     view: 'twin'
@@ -2031,7 +2085,7 @@ const AIRCRAFT_STEPS = [
     view: 'twin'
   },
   {
-    targetId: 'btn-view-fleet',
+    targetId: 'top-nav-switcher',
     place: 'below',
     eyebrow: 'Aircraft Step 2 of 4 — Multi-UAV Switching',
     title: 'Twin, Single & Squadron Fleet Command',
@@ -2228,7 +2282,8 @@ const tourBack       = document.getElementById('tour-back');
 const tourSkip       = document.getElementById('tour-skip');
 const tourDontShow   = document.getElementById('tour-dontshow-final');
 const tourDontWrap   = document.getElementById('tour-dontshow-wrap');
-const nacelleOverlay = document.getElementById('tour-nacelle-pulse');
+const nacelleOverlayPort = document.getElementById('tour-nacelle-pulse-port');
+const nacelleOverlayStbd = document.getElementById('tour-nacelle-pulse-stbd');
 
 let tourActive    = false;
 let tourPhase     = 'aircraft';   // 'aircraft' | 'engine' | 'fleet'
@@ -2256,10 +2311,9 @@ const PAD = 8;
 /* Project a 3D nacelle world position to CSS screen coordinates */
 function nacelleScreenPos(side) {
   if (!aircraft) return null;
-  const node = aircraft.getObjectByName('engine_' + side);
-  if (!node) return null;
-  const vec = new THREE.Vector3();
-  node.getWorldPosition(vec);
+  const centers = getNacelleCenters();
+  if (!centers || !centers[side]) return null;
+  const vec = centers[side].clone();
   vec.project(camera);
   const r = canvas.getBoundingClientRect();
   return {
@@ -2270,21 +2324,28 @@ function nacelleScreenPos(side) {
 
 /* Animate nacelle rings tracking the 3D objects */
 function tickNacelleOverlay() {
-  const pos = nacelleScreenPos('port') || nacelleScreenPos('starboard');
-  if (pos) {
-    nacelleOverlay.style.left = pos.x + 'px';
-    nacelleOverlay.style.top  = pos.y + 'px';
+  const posPort = nacelleScreenPos('port');
+  if (posPort && nacelleOverlayPort) {
+    nacelleOverlayPort.style.left = posPort.x + 'px';
+    nacelleOverlayPort.style.top  = posPort.y + 'px';
+  }
+  const posStbd = nacelleScreenPos('starboard');
+  if (posStbd && nacelleOverlayStbd) {
+    nacelleOverlayStbd.style.left = posStbd.x + 'px';
+    nacelleOverlayStbd.style.top  = posStbd.y + 'px';
   }
   nacelleRafId = requestAnimationFrame(tickNacelleOverlay);
 }
 
 function showNacelleOverlay() {
-  nacelleOverlay.classList.remove('hidden');
+  if (nacelleOverlayPort) nacelleOverlayPort.classList.remove('hidden');
+  if (nacelleOverlayStbd) nacelleOverlayStbd.classList.remove('hidden');
   if (!nacelleRafId) nacelleRafId = requestAnimationFrame(tickNacelleOverlay);
 }
 
 function hideNacelleOverlay() {
-  nacelleOverlay.classList.add('hidden');
+  if (nacelleOverlayPort) nacelleOverlayPort.classList.add('hidden');
+  if (nacelleOverlayStbd) nacelleOverlayStbd.classList.add('hidden');
   if (nacelleRafId) { cancelAnimationFrame(nacelleRafId); nacelleRafId = null; }
 }
 
@@ -2412,6 +2473,15 @@ function positionTour() {
     if (elemRect.top < sideRect.top + 20 || elemRect.bottom > sideRect.bottom - 20) {
       const scrollOffset = (elemRect.top + elemRect.height / 2) - (sideRect.top + sideRect.height / 2);
       sideEl.scrollBy({ top: scrollOffset, behavior: 'auto' });
+    }
+  }
+  const fleetEl = document.querySelector('.fleet-view');
+  if (fleetEl && fleetEl.contains(target)) {
+    const fleetRect = fleetEl.getBoundingClientRect();
+    const elemRect = target.getBoundingClientRect();
+    if (elemRect.top < fleetRect.top + 20 || elemRect.bottom > fleetRect.bottom - 20) {
+      const scrollOffset = (elemRect.top + elemRect.height / 2) - (fleetRect.top + fleetRect.height / 2);
+      fleetEl.scrollBy({ top: scrollOffset, behavior: 'auto' });
     }
   }
 
@@ -2599,15 +2669,21 @@ document.addEventListener('keydown', e => {
 });
 window.addEventListener('resize', () => { if (tourActive) positionTour(); });
 
-if (nacelleOverlay) {
-  nacelleOverlay.addEventListener('click', (e) => {
+if (nacelleOverlayPort) {
+  nacelleOverlayPort.addEventListener('click', (e) => {
     e.stopPropagation();
     openEngine('port');
   });
 }
+if (nacelleOverlayStbd) {
+  nacelleOverlayStbd.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openEngine('starboard');
+  });
+}
 
 /* Clear older tour keys so test users get the new tour on enter */
-['shadowtwin_tour_seen', 'shadowtwin_tour_seen_v2', 'shadowtwin_tour_seen_v3', 'shadowtwin_tour_seen_v4', 'shadowtwin_tour_seen_v5', 'shadowtwin_tour_seen_v6', 'shadowtwin_tour_seen_v7', 'shadowtwin_tour_seen_v8'].forEach(k => {
+['shadowtwin_tour_seen', 'shadowtwin_tour_seen_v2', 'shadowtwin_tour_seen_v3', 'shadowtwin_tour_seen_v4', 'shadowtwin_tour_seen_v5', 'shadowtwin_tour_seen_v6', 'shadowtwin_tour_seen_v7', 'shadowtwin_tour_seen_v8', 'shadowtwin_tour_seen_v9'].forEach(k => {
   try { localStorage.removeItem(k); } catch (e) { /* private */ }
 });
 
