@@ -1333,7 +1333,9 @@ function updateFleetCard1() {
   // Port Engine
   if (engPortEl) {
     const portHealth = portR && portR.severity != null ? Math.round((1 - portR.severity) * 100) : 99;
-    engPortEl.textContent = (stPort === 'nominal' ? 'Nominal' : stPort === 'caution' ? 'Caution' : 'Fault') + ' \u00b7 ' + portHealth + '%';
+    let text = stPort === 'nominal' ? 'Nominal' : stPort === 'caution' ? 'Caution' : 'Fault';
+    if (stPort === 'nominal' && portR && portR.instrumentation && portR.instrumentation.length > 0) text = 'Nominal (Sensor)';
+    engPortEl.textContent = text + ' \u00b7 ' + portHealth + '%';
     engPortEl.className = 'fleet-eng-state ' + stPort;
   }
   if (rulPortEl) {
@@ -1343,7 +1345,9 @@ function updateFleetCard1() {
   // Starboard Engine
   if (engStbdEl) {
     const stbdHealth = stbdR && stbdR.severity != null ? Math.round((1 - stbdR.severity) * 100) : 99;
-    engStbdEl.textContent = (stStbd === 'nominal' ? 'Nominal' : stStbd === 'caution' ? 'Caution' : 'Fault') + ' \u00b7 ' + stbdHealth + '%';
+    let text = stStbd === 'nominal' ? 'Nominal' : stStbd === 'caution' ? 'Caution' : 'Fault';
+    if (stStbd === 'nominal' && stbdR && stbdR.instrumentation && stbdR.instrumentation.length > 0) text = 'Nominal (Sensor)';
+    engStbdEl.textContent = text + ' \u00b7 ' + stbdHealth + '%';
     engStbdEl.className = 'fleet-eng-state ' + stStbd;
   }
   if (rowStbdEl) {
@@ -1376,7 +1380,9 @@ function updateFleetCard1() {
   }
   if (c2EngEl) {
     const pHealth = portR && portR.severity != null ? Math.round((1 - portR.severity) * 100) : 99;
-    c2EngEl.textContent = (sEngSt === 'nominal' ? 'Nominal' : sEngSt === 'caution' ? 'Caution' : 'Fault') + ' \u00b7 ' + pHealth + '%';
+    let text = sEngSt === 'nominal' ? 'Nominal' : sEngSt === 'caution' ? 'Caution' : 'Fault';
+    if (sEngSt === 'nominal' && portR && portR.instrumentation && portR.instrumentation.length > 0) text = 'Nominal (Sensor)';
+    c2EngEl.textContent = text + ' \u00b7 ' + pHealth + '%';
     c2EngEl.className = 'fleet-eng-state ' + sEngSt;
   }
   if (r2EngEl) {
@@ -1397,7 +1403,11 @@ function paint() {
 
   for (const side of ['port', 'starboard']) {
     const st = uiStatus(side);
-    const [stateText, pillText] = STATE_TEXT[st];
+    let [stateText, pillText] = STATE_TEXT[st];
+    const r = live && live.engines && live.engines[side];
+    if (st === 'nominal' && r && r.instrumentation && r.instrumentation.length > 0) {
+      stateText = 'Nominal (Sensor)';
+    }
     updateRing(side, st);
     document.getElementById('state-' + side).textContent = stateText;
     const pill = document.getElementById('pill-' + side);
