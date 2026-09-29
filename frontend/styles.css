@@ -1369,3 +1369,100 @@ button:disabled:hover { background: transparent; }
   font-style: italic;
 }
 
+/* ---------- Engine Nacelle Labels (aircraft view) ---------- */
+.nacelle-label-tag {
+  position: absolute;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translate(-50%, 0);
+  opacity: 0;
+  transition: opacity 320ms var(--ease);
+  z-index: 4;
+}
+.nacelle-label-tag.shown {
+  opacity: 1;
+}
+.nacelle-label-tag .nacelle-tag-anchor {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ink-soft);
+  opacity: 0.7;
+  box-shadow: 0 0 0 2px rgba(247, 246, 243, 0.95);
+}
+.nacelle-label-tag .nacelle-tag-line {
+  width: 1px;
+  height: 22px;
+  background: var(--ink-soft);
+  opacity: 0.35;
+}
+.nacelle-label-tag .nacelle-tag-text {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--ink);
+  background: rgba(247, 246, 243, 0.94);
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  white-space: nowrap;
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.nacelle-label-tag .nacelle-tag-text .tag-sub {
+  font-size: 9.5px;
+  font-weight: 500;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ---------- Fleet Card: Single-Engine Differentiation ---------- */
+.fleet-card.single-engine {
+  border-left: 4px solid var(--caution);
+  background: linear-gradient(135deg, rgba(181, 134, 63, 0.04) 0%, var(--panel) 100%);
+}
+.fleet-card.single-engine .fleet-card-tag::before {
+  content: '⚙ ';
+}
+
+/* Highlighted Inspect Single-Engine button */
+.fleet-btn.highlight {
+  background: #B5863F;
+  color: #FFFFFF;
+  border: 1px solid #9E7432;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(181, 134, 63, 0.25);
+  cursor: pointer;
+  transition: all 180ms ease;
+}
+.fleet-btn.highlight:hover {
+  background: #9E7432;
+  color: #FFFFFF;
+  box-shadow: 0 3px 10px rgba(181, 134, 63, 0.40);
+  transform: translateY(-1px);
+}
+
+/* Fleet grid section divider */
+.fleet-section-label {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding: 8px 0 4px 0;
+  border-bottom: 1px solid var(--line-soft);
+  margin-top: 4px;
+  margin-bottom: 2px;
+}
+.fleet-section-label:first-child {
+  padding-top: 0;
+  margin-top: 0;
+}
+

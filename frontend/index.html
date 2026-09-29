@@ -224,6 +224,7 @@
   </div>
 
   <div class="fleet-grid">
+    <div class="fleet-section-label">Twin-Engine MALE UAVs (ADE TAPAS-BH-201 Class)</div>
     <!-- Card 1: TAPAS-01 -->
     <div class="fleet-card active-live" id="fleet-card-1">
       <div class="fleet-card-head">
@@ -256,35 +257,6 @@
         <span class="fleet-margin-chip">Engine-Out: <strong id="fleet-card1-out">+923h</strong></span>
       </div>
       <button class="fleet-btn primary" id="btn-fleet-open-twin">Inspect Live Digital Twin →</button>
-    </div>
-
-    <!-- Card 2: RUSTOM-01 (Single-Engine Tactical UAV) -->
-    <div class="fleet-card" id="fleet-card-2">
-      <div class="fleet-card-head">
-        <div>
-          <div class="fleet-card-tag">R-101-A01 · SINGLE-ENGINE TACTICAL UAV</div>
-          <h3 class="fleet-card-title">RUSTOM-01 (Alpha-01)</h3>
-        </div>
-        <span class="pill nominal" id="fleet-card2-status">GO</span>
-      </div>
-      <div class="fleet-badge-live static">
-        Single-Engine Powerplant · 10 Hz CAN
-      </div>
-      <div class="fleet-mission-desc">
-        Tactical Reconnaissance · Sortie #27 · 2,800m · Single Aero-Diesel
-      </div>
-      <div class="fleet-engines-status single">
-        <div class="fleet-eng-col">
-          <span class="fleet-eng-label">PRIMARY POWERPLANT (2.2L AERO-DIESEL)</span>
-          <span class="fleet-eng-state nominal" id="fleet-card2-eng">Nominal · 99%</span>
-          <span class="fleet-eng-rul" id="fleet-card2-rul">RUL: +890h · Standalone Twin</span>
-        </div>
-      </div>
-      <div class="fleet-margins">
-        <span class="fleet-margin-chip">Sortie Margin: <strong id="fleet-card2-margin">+890h</strong></span>
-        <span class="fleet-margin-chip">Platform: <strong>Single Engine Direct Twin</strong></span>
-      </div>
-      <button class="fleet-btn" id="btn-fleet-open-single">Inspect Single-Engine UAV →</button>
     </div>
 
     <!-- Card 3: TAPAS-03 -->
@@ -358,6 +330,36 @@
         Oil spectrometry clean. Common-rail pressure calibration and valve clearance checks in progress.
       </div>
     </div>
+
+    <div class="fleet-section-label">Single-Engine Tactical UAVs (ADE Rustom-I Class)</div>
+    <!-- Card 2: RUSTOM-01 (Single-Engine Tactical UAV) -->
+    <div class="fleet-card single-engine" id="fleet-card-2">
+      <div class="fleet-card-head">
+        <div>
+          <div class="fleet-card-tag">R-101-A01 · SINGLE-ENGINE TACTICAL UAV</div>
+          <h3 class="fleet-card-title">RUSTOM-01 (Alpha-01)</h3>
+        </div>
+        <span class="pill nominal" id="fleet-card2-status">GO</span>
+      </div>
+      <div class="fleet-badge-live static">
+        Single-Engine Powerplant · 10 Hz CAN
+      </div>
+      <div class="fleet-mission-desc">
+        Tactical Reconnaissance · Sortie #27 · 2,800m · Single Aero-Diesel
+      </div>
+      <div class="fleet-engines-status single">
+        <div class="fleet-eng-col">
+          <span class="fleet-eng-label">PRIMARY POWERPLANT (2.2L AERO-DIESEL)</span>
+          <span class="fleet-eng-state nominal" id="fleet-card2-eng">Nominal · 99%</span>
+          <span class="fleet-eng-rul" id="fleet-card2-rul">RUL: +890h · Standalone Twin</span>
+        </div>
+      </div>
+      <div class="fleet-margins">
+        <span class="fleet-margin-chip">Sortie Margin: <strong id="fleet-card2-margin">+890h</strong></span>
+        <span class="fleet-margin-chip">Platform: <strong>Single Engine Direct Twin</strong></span>
+      </div>
+      <button class="fleet-btn highlight" id="btn-fleet-open-single">Inspect Single-Engine UAV →</button>
+    </div>
   </div>
 
   <!-- Squadron Overview Table -->
@@ -401,7 +403,7 @@
           <td><strong id="fleet-row-single-margin">+890h</strong></td>
           <td><span class="row-muted">N/A (Single)</span></td>
           <td><span class="pill nominal" id="fleet-row-single-status">GO</span></td>
-          <td><button class="fleet-row-btn" id="btn-fleet-table-single">Open Twin →</button></td>
+          <td><button class="fleet-row-btn" id="btn-fleet-table-single">Inspect Engine →</button></td>
         </tr>
         <tr>
           <td><strong>TAPAS-03</strong> <span class="sub-tag">T-201-B03</span></td>

@@ -55,7 +55,13 @@ controls.dampingFactor = 0.08;
 controls.enablePan = false;
 controls.minDistance = 2;
 controls.maxDistance = 60;
-controls.addEventListener('change', () => { needsRender = true; });
+controls.addEventListener('start', () => {
+  if (typeof onCameraMove === 'function') onCameraMove();
+});
+controls.addEventListener('change', () => {
+  needsRender = true;
+  if (typeof onCameraMove === 'function') onCameraMove();
+});
 
 let needsRender = true;
 let aircraft = null, engine = null, engineLoading = null;
@@ -121,6 +127,7 @@ function loop(t) {
   if (needsRender || controls.enableDamping || camAnim) {
     renderer.render(scene, camera);
     positionCallouts();
+    positionNacelleLabels();
     needsRender = false;
   }
 }
@@ -737,22 +744,95 @@ function positionCallouts() {
     }
   }
   if (focusCalloutEl && focusedPartId && engine) {
-    const node = engine.getObjectByName(focusedPartId);
-    if (node) {
-      const box = new THREE.Box3().setFromObject(node);
-      box.getCenter(_v);
-      _v.project(camera);
-      const x = (_v.x * 0.5 + 0.5) * w;
-      const y = (-_v.y * 0.5 + 0.5) * h;
-      const visible = _v.z < 1;
-      focusCalloutEl.style.left = x + 'px';
-      focusCalloutEl.style.top = y + 'px';
-      focusCalloutEl.classList.toggle('shown', visible);
+    const cfg = PART_FOCUS_CONFIG[focusedPartId];
+    if (cfg && cfg.target) {
+      _v.set(...cfg.target);
+    } else {
+      const node = engine.getObjectByName(focusedPartId);
+      if (node) {
+        const box = new THREE.Box3().setFromObject(node);
+        box.getCenter(_v);
+      }
     }
+    _v.project(camera);
+    const x = (_v.x * 0.5 + 0.5) * w;
+    const y = (-_v.y * 0.5 + 0.5) * h;
+    const visible = _v.z < 1 && x > 10 && x < (w - 10) && y > 10 && y < (h - 10);
+    focusCalloutEl.style.left = x + 'px';
+    focusCalloutEl.style.top = y + 'px';
+    focusCalloutEl.classList.toggle('shown', visible);
   }
 }
 
-/* ---------- info bar tab switching ---------- */
+/* --- nacelle engine labels: subtle tags on the aircraft view --- */
+
+let nacelleTagPort = null;
+let nacelleTagStbd = null;
+let nacelleLabelsVisible = true;
+let nacelleRotTimeout = null;
+
+function createNacelleLabels() {
+  if (nacelleTagPort) return;
+  nacelleTagPort = document.createElement('div');
+  nacelleTagPort.className = 'nacelle-label-tag';
+  nacelleTagPort.innerHTML = '<span class="nacelle-tag-anchor"></span><span class="nacelle-tag-line"></span><span class="nacelle-tag-text">Engine Left <span class="tag-sub">Port</span></span>';
+  labelBox.appendChild(nacelleTagPort);
+
+  nacelleTagStbd = document.createElement('div');
+  nacelleTagStbd.className = 'nacelle-label-tag';
+  nacelleTagStbd.innerHTML = '<span class="nacelle-tag-anchor"></span><span class="nacelle-tag-line"></span><span class="nacelle-tag-text">Engine Right <span class="tag-sub">Starboard</span></span>';
+  labelBox.appendChild(nacelleTagStbd);
+}
+
+function hideNacelleLabels() {
+  nacelleLabelsVisible = false;
+  if (nacelleTagPort) nacelleTagPort.classList.remove('shown');
+  if (nacelleTagStbd) nacelleTagStbd.classList.remove('shown');
+}
+
+function onCameraMove() {
+  if (view === 'aircraft' && appMode === 'twin') {
+    hideNacelleLabels();
+    if (nacelleRotTimeout) clearTimeout(nacelleRotTimeout);
+    nacelleRotTimeout = setTimeout(() => {
+      nacelleLabelsVisible = true;
+      needsRender = true;
+    }, 280);
+  }
+}
+
+function positionNacelleLabels() {
+  /* Only show on aircraft view in twin mode */
+  if (view !== 'aircraft' || appMode !== 'twin' || !aircraft) {
+    hideNacelleLabels();
+    return;
+  }
+  createNacelleLabels();
+
+  if (!nacelleLabelsVisible) return;
+
+  /* Position labels from 3D projection of nacelle nodes */
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  const sides = [
+    { node: 'engine_port', el: nacelleTagPort },
+    { node: 'engine_starboard', el: nacelleTagStbd }
+  ];
+  for (const s of sides) {
+    const obj = aircraft.getObjectByName(s.node);
+    if (!obj || !s.el) continue;
+    const vec = new THREE.Vector3();
+    obj.getWorldPosition(vec);
+    vec.project(camera);
+    const x = (vec.x * 0.5 + 0.5) * w;
+    const y = (-vec.y * 0.5 + 0.5) * h;
+    const onScreen = vec.z < 1 && x > 20 && x < (w - 20) && y > 20 && y < (h - 20);
+    s.el.style.left = x + 'px';
+    s.el.style.top = y + 'px';
+    s.el.classList.toggle('shown', onScreen && nacelleLabelsVisible);
+  }
+}
+
+
 
 /* Switch between Findings and Readings tabs in the floating infobar.
    Called explicitly — never driven by a high-frequency update path. */
@@ -1926,14 +2006,14 @@ if (btnFleetTableSingle) btnFleetTableSingle.onclick = showSingleView;
 
 /* ---------- spotlight guide ---------- */
 
-const TOUR_KEY = 'shadowtwin_tour_seen_v8';
+const TOUR_KEY = 'shadowtwin_tour_seen_v9';
 
-/* ---- Aircraft-view steps (5 steps total, zero duplication) ---- */
+/* ---- Aircraft-view steps (Twin-engine MALE airframe) ---- */
 const AIRCRAFT_STEPS = [
   {
     targetId: null,
     place: 'center',
-    eyebrow: 'AeroTwin \u2014 Guided Walkthrough',
+    eyebrow: 'AeroTwin — Guided Walkthrough',
     title: 'Digital Twin for Twin-Engine MALE UAVs',
     body: 'Welcome to AeroTwin (DRDO SIH 26054). This system runs a real-time physics model side-by-side with incoming CAN bus telemetry to detect propulsion anomalies, isolate sensor faults, and predict remaining useful life before faults become critical.',
     showDontShow: false,
@@ -1943,7 +2023,7 @@ const AIRCRAFT_STEPS = [
   {
     targetId: 'viewport',
     place: 'stage-card',
-    eyebrow: 'Aircraft Step 1 of 4 \u2014 3D Airframe',
+    eyebrow: 'Aircraft Step 1 of 4 — 3D Airframe',
     title: 'TAPAS-BH-201 3D Airframe',
     body: '<strong>Drag</strong> to orbit, <strong>scroll</strong> to zoom. The twin wing-mounted nacelles house the 2.2\u202fL turbo-diesel aero powerplants. Each engine operates an independent CAN ECU with cross-engine AI correlation.',
     showDontShow: false,
@@ -1953,7 +2033,7 @@ const AIRCRAFT_STEPS = [
   {
     targetId: 'btn-view-fleet',
     place: 'below',
-    eyebrow: 'Aircraft Step 2 of 4 \u2014 Multi-UAV Switching',
+    eyebrow: 'Aircraft Step 2 of 4 — Multi-UAV Switching',
     title: 'Twin, Single & Squadron Fleet Command',
     body: 'Use this top switcher to toggle between <strong>TAPAS-01 Twin-Engine UAV</strong>, <strong>RUSTOM-01 Single-Engine Tactical UAV</strong>, and the <strong>Squadron Fleet Command</strong> monitoring 4 airframes simultaneously.',
     showDontShow: false,
@@ -1963,7 +2043,7 @@ const AIRCRAFT_STEPS = [
   {
     targetId: 'mission-banner',
     place: 'left',
-    eyebrow: 'Aircraft Step 3 of 4 \u2014 Operational Readiness',
+    eyebrow: 'Aircraft Step 3 of 4 — Operational Readiness',
     title: 'Mission Go / Caution / No-Go & Margins',
     body: 'The <strong>GO / CAUTION / NO-GO</strong> banner combines propulsion health across both engines into a single operational call. Below it, <strong>Hours pair margin</strong> and <strong>Engine-out margin</strong> update in real time.',
     showDontShow: false,
@@ -1973,75 +2053,21 @@ const AIRCRAFT_STEPS = [
   {
     targetId: 'viewport',
     place: 'stage-card',
-    eyebrow: 'Aircraft Step 4 of 4 \u2014 Deep Engine Inspection',
-    title: 'Click an engine nacelle to fly inside',
-    body: 'Pulsing rings highlight the twin nacelles. <strong>Click either engine nacelle</strong> (or click Port in the sidebar) to fly inside the 3D powerplant and inspect internal component diagnostics!',
+    eyebrow: 'Aircraft Step 4 of 4 — Deep Engine Inspection',
+    title: 'Inspect Inside 3D Powerplant',
+    body: 'Pulsing rings highlight the twin nacelles. <strong>Click either engine nacelle</strong> in 3D or click <strong>Inspect Engine →</strong> below to fly inside the 3D powerplant and inspect internal component diagnostics!',
     showDontShow: false,
     type: 'click-engine',
     view: 'twin'
   }
 ];
 
-/* ---- Single-engine-view steps (shown when tour is opened in Single-engine view) ---- */
-const SINGLE_STEPS = [
-  {
-    targetId: null,
-    place: 'center',
-    eyebrow: 'RUSTOM-01 \u2014 Single-Engine UAV',
-    title: 'Standalone Engine Digital Twin',
-    body: 'This platform monitors a single-engine tactical UAV powerplant directly in 3D without requiring the aircraft airframe. All CAN telemetry and physics models connect to the primary 2.2L aero-diesel unit.',
-    showDontShow: false,
-    type: 'normal',
-    view: 'single'
-  },
-  {
-    targetId: 'entry-architecture',
-    place: 'left',
-    eyebrow: 'Single-Engine Step 1 of 4 \u2014 Tactical Architecture',
-    title: 'Critical Single Point of Failure (SPOF)',
-    body: 'Unlike twin-engine UAVs, single-engine tactical UAVs have <strong>zero engine-out redundancy</strong>. Any critical anomaly triggers an immediate abort protocol (forced glide or parachute recovery).',
-    showDontShow: false,
-    type: 'normal',
-    view: 'single'
-  },
-  {
-    targetId: 'stage-infobar',
-    place: 'right',
-    eyebrow: 'Single-Engine Step 2 of 4 \u2014 Telemetry vs Physics',
-    title: 'Simplex CAN Bus Ingestion',
-    body: 'Sensor channels are ingested over a simplex CAN bus link (ECU-1 Node) and continuously compared against the Mean Value Engine Model.',
-    showDontShow: false,
-    type: 'normal',
-    view: 'single'
-  },
-  {
-    targetId: 'sec-parts',
-    place: 'left',
-    eyebrow: 'Single-Engine Step 3 of 4 \u2014 Component Diagnostics',
-    title: 'Interactive 3D Component Focus',
-    body: 'Click any component in this list (Turbocharger, Common Rail, Injectors, Controller) to smoothly pivot the 3D camera and highlight that part with 3D pin callouts.',
-    showDontShow: false,
-    type: 'normal',
-    view: 'single'
-  },
-  {
-    targetId: 'btn-view-twin',
-    place: 'below',
-    eyebrow: 'Single-Engine Step 4 of 4 \u2014 Platform Switch',
-    title: 'Switch between UAV classes',
-    body: 'Click <strong>TAPAS-01 Twin-Engine UAV</strong> at any time to return to the twin wing-mounted airframe.',
-    showDontShow: true,
-    type: 'normal',
-    view: 'single'
-  }
-];
-
-/* ---- Engine-view steps (shown after openEngine() during tour — NO REPEATS) ---- */
+/* ---- Engine-view steps (Internal diagnostics & physics residuals) ---- */
 const ENGINE_STEPS = [
   {
     targetId: 'viewport',
     place: 'stage-card',
-    eyebrow: 'Engine Step 1 of 5 \u2014 3D Internals',
+    eyebrow: 'Engine Step 1 of 5 — 3D Internals',
     title: 'Inside the 2.2L Aero-Diesel Powerplant',
     body: 'You are now inside the 3D engine model. Flagged components highlight in <strong>brick-red for fault</strong> or <strong>amber for caution</strong>, and automatically pop out in 3D exploded view with diagnostic callouts.',
     showDontShow: false,
@@ -2050,7 +2076,7 @@ const ENGINE_STEPS = [
   {
     targetId: 'stage-infobar',
     place: 'right',
-    eyebrow: 'Engine Step 2 of 5 \u2014 Telemetry vs Physics',
+    eyebrow: 'Engine Step 2 of 5 — Telemetry vs Physics',
     title: 'Mean Value Engine Model (MVEM)',
     body: 'Every sensor channel displays its <strong>measured telemetry</strong> alongside what the healthy physics model expected at this operating point. The residual delta separates engine degradation from flight condition changes.',
     showDontShow: false,
@@ -2059,7 +2085,7 @@ const ENGINE_STEPS = [
   {
     targetId: 'stage-infobar',
     place: 'right',
-    eyebrow: 'Engine Step 3 of 5 \u2014 AI Root Cause Isolation',
+    eyebrow: 'Engine Step 3 of 5 — AI Root Cause Isolation',
     title: 'Findings & Sensor Trust Gateway',
     body: 'The AI isolation forest and robust classifier name the fault in plain language with confidence percentages. The Sensor Trust Gateway strictly isolates faulty sensors so sensor issues are never confused with engine faults.',
     showDontShow: false,
@@ -2068,7 +2094,7 @@ const ENGINE_STEPS = [
   {
     targetId: 'sec-parts',
     place: 'left',
-    eyebrow: 'Engine Step 4 of 5 \u2014 Component Diagnostics',
+    eyebrow: 'Engine Step 4 of 5 — Component Diagnostics',
     title: 'Interactive 3D Component Focus',
     body: 'Click any component in this list \u2014 <strong>Turbocharger</strong>, <strong>Common Rail</strong>, <strong>Injectors</strong>, <strong>Exhaust</strong>, or <strong>Controller</strong> \u2014 to automatically pivot and zoom the 3D camera right onto that part with dedicated 3D pin callouts!',
     showDontShow: false,
@@ -2077,23 +2103,76 @@ const ENGINE_STEPS = [
   {
     targetId: 'sec-simulate',
     place: 'left',
-    eyebrow: 'Engine Step 5 of 5 \u2014 Fault Injection',
+    eyebrow: 'Engine Step 5 of 5 — Fault Injection',
     title: 'Simulate degradation & stress test',
-    body: 'Click <strong>Injector fault</strong>, <strong>Sensor fault</strong>, or <strong>Both engines drift</strong> to see 3D components pop out and detection react in seconds. <strong>Clear</strong> smoothly restores nominal operation.',
-    showDontShow: true,
+    body: 'Click <strong>Injector fault</strong>, <strong>Sensor fault</strong>, or <strong>Both engines drift</strong> to see 3D components pop out and detection react in seconds. Click <strong>Next</strong> to inspect the single-engine tactical UAV!',
+    showDontShow: false,
     type: 'normal'
   }
 ];
 
-/* ---- Fleet-view steps (shown when tour is opened in Fleet view) ---- */
+/* ---- Single-engine-view steps (Tactical single-engine standalone twin) ---- */
+const SINGLE_STEPS = [
+  {
+    targetId: 'viewport',
+    place: 'stage-card',
+    eyebrow: 'Single-Engine Step 1 of 5 — Standalone Twin',
+    title: 'RUSTOM-01 Tactical Powerplant Twin',
+    body: 'This platform directly monitors a single-engine tactical UAV powerplant in 3D mounted on an engineering test stand. All CAN telemetry and physics models connect to this primary 2.2L aero-diesel unit without requiring the aircraft airframe.',
+    showDontShow: false,
+    type: 'normal',
+    view: 'single'
+  },
+  {
+    targetId: 'entry-architecture',
+    place: 'left',
+    eyebrow: 'Single-Engine Step 2 of 5 — Tactical Architecture',
+    title: 'Tactical Propulsion Topology & Simplex CAN',
+    body: '<strong>Critical SPOF Architecture:</strong> Unlike twin-engine UAVs with asymmetric engine-out margins, single-engine tactical UAVs have <strong>zero engine-out redundancy</strong>. Sensor channels stream over a Simplex J1939 CAN bus link (ECU-1 Node @ 0x18FF0101). Any unrecoverable telemetry divergence triggers an immediate abort protocol (forced glide or parachute recovery).',
+    showDontShow: false,
+    type: 'normal',
+    view: 'single'
+  },
+  {
+    targetId: 'stage-infobar',
+    place: 'right',
+    eyebrow: 'Single-Engine Step 3 of 5 — Telemetry & Physics',
+    title: 'Simplex CAN Bus Ingestion & MVEM Delta',
+    body: 'Incoming simplex CAN frames are continuously compared against the healthy Mean Value Engine Model to isolate sensor drift from real thermodynamic degradation.',
+    showDontShow: false,
+    type: 'normal',
+    view: 'single'
+  },
+  {
+    targetId: 'sec-parts',
+    place: 'left',
+    eyebrow: 'Single-Engine Step 4 of 5 — Component Diagnostics',
+    title: 'Interactive 3D Component Diagnostics',
+    body: 'Click any component in this list (Turbocharger, Common Rail, Injectors, Controller) to smoothly pivot the 3D camera and highlight internal components with diagnostic callout pins.',
+    showDontShow: false,
+    type: 'normal',
+    view: 'single'
+  },
+  {
+    targetId: 'btn-view-fleet',
+    place: 'below',
+    eyebrow: 'Single-Engine Step 5 of 5 — Fleet Command',
+    title: 'Explore Squadron Fleet Command',
+    body: 'Click <strong>Next</strong> to explore the Squadron Fleet Command dashboard, monitoring multiple twin and single-engine tactical UAVs across the fleet simultaneously.',
+    showDontShow: false,
+    type: 'normal',
+    view: 'single'
+  }
+];
+
+/* ---- Fleet-view steps (Squadron fleet command) ---- */
 const FLEET_STEPS = [
   {
     targetId: null,
     place: 'center',
-    eyebrow: 'Fleet Command \u2014 Quick Guide',
+    eyebrow: 'Fleet Command Step 1 of 5 — Squadron Overview',
     title: 'Squadron Propulsion Fleet Command',
-    body: 'This dashboard provides fleet-level health monitoring and predictive maintenance ' +
-          'across multiple MALE UAVs, directly fulfilling the DRDO SIH 26054 multi-aircraft requirement.',
+    body: 'This dashboard provides fleet-level health monitoring and predictive maintenance across multiple MALE & tactical UAVs, directly fulfilling the DRDO SIH 26054 multi-aircraft requirement.',
     showDontShow: false,
     type: 'normal',
     view: 'fleet'
@@ -2101,10 +2180,19 @@ const FLEET_STEPS = [
   {
     targetId: 'fleet-card-1',
     place: 'right',
-    eyebrow: 'Fleet Step 1 of 4 \u2014 Live Digital Twin',
-    title: 'TAPAS-01 (Bravo-01) Live Link',
-    body: 'This airframe is currently connected to the live CAN bus telemetry feed. ' +
-          'Click <strong>Inspect Live Digital Twin \u2192</strong> (or the top tab) to open the full 3D interactive model and physics analytics.',
+    eyebrow: 'Fleet Command Step 2 of 5 — Twin-Engine UAVs',
+    title: 'TAPAS-01 (Bravo-01) Live Digital Twin',
+    body: 'Connected to the live dual-node CAN bus feed with real-time physics residuals and asymmetric engine-out margins.',
+    showDontShow: false,
+    type: 'normal',
+    view: 'fleet'
+  },
+  {
+    targetId: 'fleet-card-2',
+    place: 'left',
+    eyebrow: 'Fleet Command Step 3 of 5 — Single-Engine UAVs',
+    title: 'Single-Engine Tactical UAV Differentiation',
+    body: 'Single-engine airframes are clearly separated in their own dedicated section with SPOF safety protocols and a highlighted <strong>Inspect Single-Engine UAV →</strong> button to launch the standalone powerplant twin.',
     showDontShow: false,
     type: 'normal',
     view: 'fleet'
@@ -2112,20 +2200,9 @@ const FLEET_STEPS = [
   {
     targetId: 'fleet-card-3',
     place: 'left',
-    eyebrow: 'Fleet Step 2 of 4 \u2014 Fleet Caution Alert',
-    title: 'Automated fleet-wide anomaly tracking',
-    body: 'When any aircraft in the squadron begins to degrade, it is immediately flagged with root-cause advisories ' +
-          '(such as TAPAS-03\u2019s Starboard EGT drift and injector variance) before flight safety is compromised.',
-    showDontShow: false,
-    type: 'normal',
-    view: 'fleet'
-  },
-  {
-    targetId: 'fleet-card-4',
-    place: 'left',
-    eyebrow: 'Fleet Step 3 of 4 \u2014 Depot Maintenance',
-    title: 'Scheduled service tracking',
-    body: 'Tracks airframes in hangared depot maintenance at ATR Chitradurga, including run hours and periodic inspection clearance.',
+    eyebrow: 'Fleet Command Step 4 of 5 — Anomaly Tracking',
+    title: 'Automated Fleet Anomaly Detection',
+    body: 'When any aircraft in the squadron begins to degrade, it is immediately flagged with root-cause advisories (such as TAPAS-03’s Starboard EGT drift and injector variance) before flight safety is compromised.',
     showDontShow: false,
     type: 'normal',
     view: 'fleet'
@@ -2133,9 +2210,9 @@ const FLEET_STEPS = [
   {
     targetId: 'btn-view-twin',
     place: 'below',
-    eyebrow: 'Fleet Step 4 of 4 \u2014 Deep Engine Inspection',
+    eyebrow: 'Fleet Command Step 5 of 5 — Tour Complete',
     title: 'Return to 3D Digital Twin',
-    body: 'Click <strong>TAPAS-01 Live Twin</strong> at any time to return to the interactive 3D airframe, physics residual charts, and component-level diagnostics.',
+    body: 'Click <strong>Finish</strong> or <strong>TAPAS-01 Live Twin</strong> to return to the interactive 3D airframe, physics residual charts, and component-level diagnostics.',
     showDontShow: true,
     type: 'normal',
     view: 'fleet'
@@ -2231,13 +2308,32 @@ function positionTour() {
   document.getElementById('tour-tip-body').innerHTML    = step.body;
   tourDontWrap.classList.toggle('hidden', !step.showDontShow);
 
-  /* button states */
-  const isLast      = tourIdx === steps.length - 1;
-  const isFirst     = tourIdx === 0 && (tourPhase === 'aircraft' || tourPhase === 'fleet' || tourPhase === 'single');
-  const clickEngine = step.type === 'click-engine';
-  tourNext.textContent = isLast ? 'Finish' : 'Next \u2192';
-  tourNext.classList.toggle('hidden', clickEngine);
-  tourBack.classList.toggle('hidden', isFirst);
+  /* button states across the unified 4-phase walkthrough */
+  const isOverallFirst = (tourPhase === 'aircraft' && tourIdx === 0);
+  const isOverallLast  = (tourPhase === 'fleet' && tourIdx === steps.length - 1);
+  const clickEngine    = step.type === 'click-engine';
+
+  if (clickEngine) {
+    tourNext.textContent = 'Inspect Engine \u2192';
+    tourNext.classList.remove('hidden');
+  } else if (tourPhase === 'aircraft' && tourIdx === steps.length - 1) {
+    tourNext.textContent = 'Next: Engine Internals \u2192';
+    tourNext.classList.remove('hidden');
+  } else if (tourPhase === 'engine' && tourIdx === steps.length - 1) {
+    tourNext.textContent = 'Next: Single-Engine UAV \u2192';
+    tourNext.classList.remove('hidden');
+  } else if (tourPhase === 'single' && tourIdx === steps.length - 1) {
+    tourNext.textContent = 'Next: Fleet Command \u2192';
+    tourNext.classList.remove('hidden');
+  } else if (isOverallLast) {
+    tourNext.textContent = 'Finish';
+    tourNext.classList.remove('hidden');
+  } else {
+    tourNext.textContent = 'Next \u2192';
+    tourNext.classList.remove('hidden');
+  }
+
+  tourBack.classList.toggle('hidden', isOverallFirst);
 
   /* dots */
   buildDots();
@@ -2417,14 +2513,43 @@ function tourOnEngineOpen() {
 
 tourNext.onclick = () => {
   const steps = currentSteps();
-  if ((tourPhase === 'fleet' || tourPhase === 'single') && tourIdx === steps.length - 1) {
-    if (tourPhase === 'fleet') showTwinView();
-    closeTour();
+  const step  = steps[tourIdx];
+
+  /* If on the click-engine step (Aircraft step 4) */
+  if (step && step.type === 'click-engine') {
+    openEngine('port');
+    tourPhase = 'engine';
+    tourIdx   = 0;
+    positionTour();
     return;
   }
+
+  /* Advance within current phase */
   if (tourIdx < steps.length - 1) {
     tourIdx += 1;
     positionTour();
+    return;
+  }
+
+  /* Transition between phases at the end of each stage */
+  if (tourPhase === 'aircraft') {
+    openEngine('port');
+    tourPhase = 'engine';
+    tourIdx   = 0;
+    positionTour();
+  } else if (tourPhase === 'engine') {
+    showSingleView();
+    tourPhase = 'single';
+    tourIdx   = 0;
+    positionTour();
+  } else if (tourPhase === 'single') {
+    showFleetView();
+    tourPhase = 'fleet';
+    tourIdx   = 0;
+    positionTour();
+  } else if (tourPhase === 'fleet') {
+    showTwinView();
+    closeTour();
   } else {
     closeTour();
   }
@@ -2436,14 +2561,23 @@ tourBack.onclick = () => {
     positionTour();
     return;
   }
-  /* at first engine step — go back to aircraft tour at the click-engine step */
-  if (tourPhase === 'engine') {
+  /* At step 0 of a phase — navigate back to previous phase */
+  if (tourPhase === 'fleet') {
+    showSingleView();
+    tourPhase = 'single';
+    tourIdx   = SINGLE_STEPS.length - 1;
+    positionTour();
+  } else if (tourPhase === 'single') {
+    showTwinView();
+    openEngine('port');
+    tourPhase = 'engine';
+    tourIdx   = ENGINE_STEPS.length - 1;
+    positionTour();
+  } else if (tourPhase === 'engine') {
     backToAircraft();
     showTwinView();
     tourPhase = 'aircraft';
-    /* find the click-engine step index */
-    tourIdx = AIRCRAFT_STEPS.findIndex(s => s.type === 'click-engine');
-    if (tourIdx < 0) tourIdx = AIRCRAFT_STEPS.length - 1;
+    tourIdx   = AIRCRAFT_STEPS.length - 1;
     positionTour();
   }
 };
@@ -2473,7 +2607,7 @@ if (nacelleOverlay) {
 }
 
 /* Clear older tour keys so test users get the new tour on enter */
-['shadowtwin_tour_seen', 'shadowtwin_tour_seen_v2', 'shadowtwin_tour_seen_v3', 'shadowtwin_tour_seen_v4', 'shadowtwin_tour_seen_v5', 'shadowtwin_tour_seen_v6', 'shadowtwin_tour_seen_v7'].forEach(k => {
+['shadowtwin_tour_seen', 'shadowtwin_tour_seen_v2', 'shadowtwin_tour_seen_v3', 'shadowtwin_tour_seen_v4', 'shadowtwin_tour_seen_v5', 'shadowtwin_tour_seen_v6', 'shadowtwin_tour_seen_v7', 'shadowtwin_tour_seen_v8'].forEach(k => {
   try { localStorage.removeItem(k); } catch (e) { /* private */ }
 });
 
